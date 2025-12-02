@@ -66,6 +66,12 @@ int tlv_read(uint16_t tag, void *buf, uint16_t *len);
  * @return 0: 成功, 其他: 错误码
  */
 int tlv_delete(uint16_t tag);
+
+/**
+ * @brief 强制保存所有挂起的更改
+ * @return 0: 成功, 其他: 错误码
+ */
+int tlv_flush(void);
  
 /**
  * @brief 检查Tag是否存在

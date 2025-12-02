@@ -39,7 +39,7 @@ const tlv_meta_const_t TLV_META_MAP[] =
     // 终止符
     {0xFFFF,                    0,      0,    0,   0,   NULL,     NULL}
 };
- 
+const int TLV_META_MAP_SIZE = (sizeof(TLV_META_MAP) / sizeof(TLV_META_MAP[0])) - 1;
 /* ============================ 辅助函数实现 ============================ */
 
 const char *tlv_get_tag_name(uint16_t tag)

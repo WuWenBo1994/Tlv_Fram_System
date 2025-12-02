@@ -20,7 +20,7 @@
 /** 最大单个数据大小 */
 #define TLV_MAX_DATA_SIZE            (4 * 1024)      // 4KB
  
-/** 使用CRC16（改为2字节） */
+/** 使用CRC16 */
 #define TLV_USE_CRC16                1
  
 /** 不使用线程安全（裸机环境） */
@@ -30,10 +30,10 @@
 #define TLV_ENABLE_MIGRATION         1
  
 /** 启动时自动迁移 */
-#define TLV_AUTO_MIGRATE_ON_BOOT     1
+#define TLV_AUTO_MIGRATE_ON_BOOT     0
  
 /** 读取时惰性迁移 */
-#define TLV_LAZY_MIGRATE_ON_READ     1
+#define TLV_LAZY_MIGRATE_ON_READ     0
 /* ============================ 内存配置 ============================ */
  
 /** 读写缓冲区大小（静态分配） */

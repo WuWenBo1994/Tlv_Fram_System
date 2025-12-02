@@ -23,22 +23,16 @@ int tlv_index_init(tlv_context_t *ctx)
         return TLV_ERROR_INVALID_PARAM;
     }
 
-    // 使用静态分配的内存，不使用malloc
+    // 使用静态分配的内存
     static tlv_system_header_t static_header;
     static tlv_index_table_t static_index;
 
     ctx->header = &static_header;
     ctx->index_table = &static_index;
 
-    // 清零索引表
-    memset(ctx->index_table, 0, sizeof(tlv_index_table_t));
-
-    // 检查静态内存大小是否足够
-    if (sizeof(tlv_system_header_t) + sizeof(tlv_index_table_t) >
-        TLV_BUFFER_SIZE)
-    {
-        return TLV_ERROR_NO_MEMORY;
-    }
+    // 清零
+    memset(&static_header, 0, sizeof(static_header));
+    memset(&static_index, 0, sizeof(static_index));
 
     return TLV_OK;
 }
@@ -259,6 +253,7 @@ int tlv_index_update(tlv_context_t *ctx, uint16_t tag, uint32_t addr)
 
     entry->data_addr = addr;
     entry->flags |= TLV_FLAG_VALID;
+    entry->flags &= ~TLV_FLAG_DIRTY;
 
     return TLV_OK;
 }
@@ -292,7 +287,7 @@ int tlv_index_remove(tlv_context_t *ctx, uint16_t tag)
 
 static const tlv_meta_const_t *find_meta_by_tag(uint16_t tag)
 {
-    for (uint32_t i = 0; i < sizeof(TLV_META_MAP) / sizeof(tlv_meta_const_t); i++)
+    for (uint32_t i = 0; i < TLV_META_MAP_SIZE; i++)
     {
         if (TLV_META_MAP[i].tag == tag)
         {
@@ -314,7 +309,7 @@ static bool is_tag_region_valid(uint16_t tag, uint32_t addr, uint32_t size)
     }
 
     // 检查是否与现有Tag区域冲突
-    for (uint32_t i = 0; i < sizeof(TLV_META_MAP) / sizeof(tlv_meta_const_t); i++)
+    for (uint32_t i = 0; i < TLV_META_MAP_SIZE; i++)
     {
         if (TLV_META_MAP[i].tag != 0xFFFF && TLV_META_MAP[i].tag != tag)
         {

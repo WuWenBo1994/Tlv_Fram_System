@@ -39,7 +39,7 @@ extern "C" {
  
 /* ============================ 外部声明 ============================ */
 extern const tlv_meta_const_t TLV_META_MAP[];  // 只声明，不定义
- 
+extern const int TLV_META_MAP_SIZE;
 /* ============================ 辅助函数 ============================ */
 const char* tlv_get_tag_name(uint16_t tag);
 uint16_t tlv_get_tag_max_length(uint16_t tag);

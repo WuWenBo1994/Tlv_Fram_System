@@ -12,7 +12,7 @@
 
 /* ============================ 全局静态变量 ============================ */
 
-static tlv_context_t g_tlv_ctx = {0};
+tlv_context_t g_tlv_ctx = {0};
 
 /* 静态分配的内存（替代malloc） */
 static tlv_system_header_t g_static_header;
@@ -28,6 +28,7 @@ static uint32_t allocate_space(uint32_t size);
 static int write_data_block(uint16_t tag, const void *data, uint16_t len, uint32_t addr);
 static int read_data_block(uint32_t addr, void *buf, uint16_t *len);
 static const tlv_meta_const_t *get_meta(uint16_t tag);
+static int tlv_backup_all_internal(void);
 
 /* ============================ 系统管理API实现 ============================ */
 
@@ -49,7 +50,7 @@ tlv_init_result_t tlv_init(void)
 
     // 设置元数据表
     g_tlv_ctx.meta_table = TLV_META_MAP;
-    g_tlv_ctx.meta_table_size = sizeof(TLV_META_MAP) / sizeof(tlv_meta_const_t);
+    g_tlv_ctx.meta_table_size = TLV_META_MAP_SIZE;
 
     // 尝试加载系统Header
     ret = system_header_load();
@@ -155,8 +156,13 @@ int tlv_format(uint32_t magic)
     }
 
     // 备份管理区
-    tlv_backup_all();
+    ret = tlv_backup_all_internal();
+    if (ret != TLV_OK)
+    {
+        return ret;
+    }
 
+    // 设置状态为已格式化
     g_tlv_ctx.state = TLV_STATE_FORMATTED;
 
     return ret;
@@ -199,6 +205,8 @@ int tlv_write(uint16_t tag, const void *data, uint16_t len)
     // 查找现有索引
     tlv_index_entry_t *index = tlv_index_find(&g_tlv_ctx, tag);
     uint32_t target_addr;
+    uint32_t old_block_size = 0;
+    uint32_t new_block_size = sizeof(tlv_data_block_header_t) + len + 2;
 
     if (index && (index->flags & TLV_FLAG_VALID))
     {
@@ -206,24 +214,28 @@ int tlv_write(uint16_t tag, const void *data, uint16_t len)
         tlv_data_block_header_t old_header;
         tlv_port_fram_read(index->data_addr, &old_header, sizeof(old_header));
 
-        uint32_t old_total_size = sizeof(tlv_data_block_header_t) + old_header.length + 2;
-        uint32_t new_total_size = sizeof(tlv_data_block_header_t) + len + 2;
+        old_block_size = sizeof(tlv_data_block_header_t) + old_header.length + 2;
 
-        if (new_total_size <= old_total_size)
+        if (new_block_size <= old_block_size)
         {
             // 原地更新
             target_addr = index->data_addr;
+            // 更新 used_space：减少旧的，增加新的
+            g_tlv_ctx.header->used_space -= old_block_size;
+            g_tlv_ctx.header->used_space += new_block_size;
         }
         else
         {
             // 需要重新分配
-            target_addr = allocate_space(new_total_size);
+            target_addr = allocate_space(new_block_size);
             if (target_addr == 0)
             {
                 return TLV_ERROR_NO_SPACE;
             }
             // 标记旧块为脏
             index->flags |= TLV_FLAG_DIRTY;
+            // 旧块变成废弃，减少 used_space
+            g_tlv_ctx.header->used_space -= old_block_size;
         }
     }
     else
@@ -241,6 +253,24 @@ int tlv_write(uint16_t tag, const void *data, uint16_t len)
     ret = write_data_block(tag, data, len, target_addr);
     if (ret != TLV_OK)
     {
+        // 写入失败，回滚 used_space
+        if (index && (index->flags & TLV_FLAG_VALID))
+        {
+            // 恢复旧值
+            if (new_block_size <= old_block_size)
+            {
+                g_tlv_ctx.header->used_space -= new_block_size;
+                g_tlv_ctx.header->used_space += old_block_size;
+            }
+            else
+            {
+                g_tlv_ctx.header->used_space += old_block_size;
+            }
+        }
+        else
+        {
+            g_tlv_ctx.header->used_space -= new_block_size;
+        }
         return ret;
     }
 
@@ -258,15 +288,21 @@ int tlv_write(uint16_t tag, const void *data, uint16_t len)
         }
     }
 
+    // 立即保存索引表到FRAM (保证一致性)
+    ret = tlv_index_save(&g_tlv_ctx);
+    if (ret != TLV_OK)
+    {
+        return ret;
+    }
+
     // 更新统计
     g_tlv_ctx.header->total_writes++;
     g_tlv_ctx.header->last_update_time = tlv_port_get_timestamp_s();
 
-    // 定期保存索引表
-    if (g_tlv_ctx.header->total_writes % 100 == 0)
+    ret = system_header_save();
+    if (ret != TLV_OK)
     {
-        tlv_index_save(&g_tlv_ctx);
-        system_header_save();
+        return ret;
     }
 
     return len; // 返回写入长度
@@ -299,22 +335,26 @@ int tlv_read(uint16_t tag, void *buf, uint16_t *len)
         return ret;
     }
 
-#if TLV_ENABLE_MIGRATION    
+#if TLV_ENABLE_MIGRATION
     // 查找元数据获取期望版本
     const tlv_meta_const_t *meta = get_meta(tag);
-    if (meta && index->version < meta->version) {
+    if (meta && index->version < meta->version)
+    {
         // 需要升级
-        
+
         // 迁移数据
         ret = tlv_migrate_tag(tag, buf, &read_len, index->version);
-        if (ret == TLV_OK) {
+        if (ret == TLV_OK)
+        {
             // 迁移成功，写回FRAM
             tlv_write(tag, buf, read_len);
-            
+
             // 更新索引版本
             index->version = meta->version;
             tlv_index_save(&g_tlv_ctx);
-        } else {
+        }
+        else
+        {
             // 迁移失败，返回错误但数据仍可用（旧版本）
             // 根据策略决定是否继续
         }
@@ -345,15 +385,23 @@ int tlv_delete(uint16_t tag)
         // 更新统计
         g_tlv_ctx.header->last_update_time = tlv_port_get_timestamp_s();
 
-        // 定期保存
-        if (g_tlv_ctx.header->total_writes % 100 == 0)
-        {
-            tlv_index_save(&g_tlv_ctx);
-            system_header_save();
-        }
+        // 删除操作必须保存索引和Header (避免幽灵数据)
+        tlv_index_save(&g_tlv_ctx);
+        system_header_save();
     }
 
     return ret;
+}
+
+int tlv_flush(void)
+{
+    int ret = tlv_index_save(&g_tlv_ctx);
+    if (ret != TLV_OK)
+    {
+        return ret;
+    }
+
+    return system_header_save();
 }
 
 bool tlv_exists(uint16_t tag)
@@ -537,6 +585,7 @@ int tlv_defragment(void)
 
     int ret = TLV_OK;
     uint32_t write_pos = TLV_DATA_ADDR;
+    uint32_t total_used = 0;
 
     // 遍历所有有效Tag
     for (int i = 0; i < TLV_MAX_TAG_COUNT; i++)
@@ -595,13 +644,17 @@ int tlv_defragment(void)
         }
 
         write_pos += block_size;
+        total_used += block_size;
     }
 
     // 更新系统Header
-    uint32_t reclaimed = (g_tlv_ctx.header->next_free_addr - TLV_DATA_ADDR) -
-                         (write_pos - TLV_DATA_ADDR);
+    uint32_t old_allocated = g_tlv_ctx.header->next_free_addr - TLV_DATA_ADDR;
+    uint32_t new_allocated = write_pos - TLV_DATA_ADDR;
+    uint32_t reclaimed = old_allocated - new_allocated;
+
     g_tlv_ctx.header->next_free_addr = write_pos;
     g_tlv_ctx.header->free_space += reclaimed;
+    g_tlv_ctx.header->used_space = total_used;
 
     // 保存更新
     tlv_index_save(&g_tlv_ctx);
@@ -694,45 +747,26 @@ int tlv_verify_all(uint32_t *corrupted_count)
     return (*corrupted_count > 0) ? TLV_ERROR_CORRUPTED : TLV_OK;
 }
 
+/* ============================ 公开函数：对外备份接口（带状态检查）============================ */
+
 int tlv_backup_all(void)
 {
+    // 对外接口：严格的状态检查
     if (g_tlv_ctx.state != TLV_STATE_INITIALIZED &&
         g_tlv_ctx.state != TLV_STATE_FORMATTED)
     {
         return TLV_ERROR;
     }
 
-    int ret = TLV_OK;
-    uint32_t backup_size = TLV_BACKUP_ADDR - TLV_HEADER_ADDR;
+    // 调用内部函数
+    int ret = tlv_backup_all_internal();
 
-    // 分批备份
-    uint32_t offset = 0;
-    while (offset < backup_size)
+    if (ret == TLV_OK)
     {
-        uint32_t chunk_size = (backup_size - offset > TLV_BUFFER_SIZE) ? TLV_BUFFER_SIZE : (backup_size - offset);
-
-        // 读取管理区
-        ret = tlv_port_fram_read(TLV_HEADER_ADDR + offset,
-                                 g_tlv_ctx.static_buffer, chunk_size);
-        if (ret != TLV_OK)
-        {
-            return ret;
-        }
-
-        // 写入备份区
-        ret = tlv_port_fram_write(TLV_BACKUP_ADDR + offset,
-                                  g_tlv_ctx.static_buffer, chunk_size);
-        if (ret != TLV_OK)
-        {
-            return ret;
-        }
-
-        offset += chunk_size;
+        // 更新备份时间
+        g_tlv_ctx.header->last_update_time = tlv_port_get_timestamp_s();
+        system_header_save();
     }
-
-    // 更新备份时间
-    g_tlv_ctx.header->last_update_time = tlv_port_get_timestamp_s();
-    system_header_save();
 
     return ret;
 }
@@ -1059,4 +1093,46 @@ static const tlv_meta_const_t *get_meta(uint16_t tag)
         }
     }
     return NULL;
+}
+
+/* ============================ 私有函数：内部备份（无状态检查）============================ */
+
+static int tlv_backup_all_internal(void)
+{
+    if (!g_tlv_ctx.header || !g_tlv_ctx.index_table)
+    {
+        return TLV_ERROR_INVALID_PARAM;
+    }
+
+    uint32_t backup_size = TLV_BACKUP_ADDR - TLV_HEADER_ADDR;
+    uint32_t offset = 0;
+    int ret = TLV_OK;
+
+    // 分批备份
+    while (offset < backup_size)
+    {
+        uint32_t chunk_size = (backup_size - offset > TLV_BUFFER_SIZE) ? TLV_BUFFER_SIZE : (backup_size - offset);
+
+        // 读取管理区
+        ret = tlv_port_fram_read(TLV_HEADER_ADDR + offset,
+                                 g_tlv_ctx.static_buffer,
+                                 chunk_size);
+        if (ret != TLV_OK)
+        {
+            return ret;
+        }
+
+        // 写入备份区
+        ret = tlv_port_fram_write(TLV_BACKUP_ADDR + offset,
+                                  g_tlv_ctx.static_buffer,
+                                  chunk_size);
+        if (ret != TLV_OK)
+        {
+            return ret;
+        }
+
+        offset += chunk_size;
+    }
+
+    return TLV_OK;
 }
