@@ -18,7 +18,7 @@ int tlv_port_fram_init(void)
 {
     // 如果你的SPI已经初始化过，这里可以为空
     // 或者调用你的初始化函数
-    spi_init();
+    // spi_init();
     
     return TLV_OK;
 }
@@ -29,9 +29,10 @@ int tlv_port_fram_read(uint32_t addr, void *data, uint32_t size)
         return TLV_ERROR_INVALID_PARAM;
     }
     
+    int ret = 0;
     // 直接调用你的SPI读函数
-    int ret = SPI_Read(addr, size, (uint8_t*)data);
-    
+    //ret = SPI_Read(addr, size, (uint8_t*)data);
+
     return (ret == 0) ? TLV_OK : TLV_ERROR;
 }
  
@@ -41,8 +42,9 @@ int tlv_port_fram_write(uint32_t addr, const void *data, uint32_t size)
         return TLV_ERROR_INVALID_PARAM;
     }
     
+    int ret = 0;
     // 直接调用你的SPI写函数
-    int ret = SPI_Write(addr, size, (const uint8_t*)data);
+    //ret = SPI_Write(addr, size, (const uint8_t*)data);
     
     return (ret == 0) ? TLV_OK : TLV_ERROR;
 }
@@ -52,10 +54,12 @@ int tlv_port_fram_write(uint32_t addr, const void *data, uint32_t size)
 uint32_t tlv_port_get_timestamp_s(void)
 {
     // 使用你的系统时间函数
-    return get_system_time_ms() / 1000;
+    // return get_system_time_ms() / 1000;
+    return 0;
 }
  
 uint32_t tlv_port_get_timestamp_ms(void)
 {
-    return get_system_time_ms();
+    // return get_system_time_ms();
+    return 0;
 }

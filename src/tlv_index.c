@@ -116,12 +116,10 @@ int tlv_index_save(tlv_context_t *ctx)
     }
 
     // 计算索引表CRC16校验码
-    ctx->index_table->index_crc16 = tlv_crc16(ctx->index_table->entries,
-                                              sizeof(ctx->index_table->entries));
+    ctx->index_table->index_crc16 = tlv_crc16(ctx->index_table->entries, sizeof(ctx->index_table->entries));
 
     // 将索引表写入FRAM存储器
-    return tlv_port_fram_write(TLV_INDEX_ADDR, ctx->index_table,
-                               sizeof(tlv_index_table_t));
+    return tlv_port_fram_write(TLV_INDEX_ADDR, ctx->index_table, sizeof(tlv_index_table_t));
 }
 
 /**

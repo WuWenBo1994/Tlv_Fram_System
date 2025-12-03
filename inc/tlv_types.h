@@ -10,7 +10,10 @@
 #include "tlv_migration.h"
 #include <stdint.h>
 #include <stdbool.h>
+#include <stddef.h>
 
+#define STATIC_CHECK_SIZE(type, expected) \
+    char check_##type[(sizeof(type) == expected) ? 1 : -1]
 /* ============================ 基础类型 ============================ */
 
 /** TLV状态枚举 */
@@ -57,9 +60,10 @@ typedef struct
     uint32_t last_update_time;  // 最后更新时间戳
     uint32_t free_space;        // 可用空间
     uint32_t used_space;        // 已用空间
-    uint8_t reserved[92];       // 保留扩展
+    uint8_t reserved[90];       // 保留扩展
     uint16_t header_crc16;      // Header自身CRC16（改为2字节）
 } tlv_system_header_t;
+
 
 /** Tag索引表项结构（8字节，简化） */
 typedef struct 

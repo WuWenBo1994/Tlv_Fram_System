@@ -11,11 +11,8 @@
 #include "tlv_migration.h"
 #include <string.h>
 
-#if sizeof(tlv_system_header_t) != 128
-    #error "tlv_system_header_t size must be 128"
-#endif
-
-
+STATIC_CHECK_SIZE(tlv_system_header_t, 128);
+STATIC_CHECK_SIZE(tlv_data_block_header_t, 14);
 /* ============================ 全局静态变量 ============================ */
 
 tlv_context_t g_tlv_ctx = {0};
@@ -133,7 +130,7 @@ int tlv_deinit(void)
 
 int tlv_format(uint32_t magic)
 {
-    // 修复：检查并设置格式化状态
+    // 检查并设置格式化状态
     if (g_tlv_ctx.state == TLV_STATE_ERROR)
     {
         // 允许格式化错误状态
@@ -284,20 +281,9 @@ int tlv_write(uint16_t tag, const void *data, uint16_t len)
     {
         if (!index)
         {
-            // 检查索引表是否满
-            uint32_t count = 0;
-            for (int i = 0; i < TLV_MAX_TAG_COUNT; i++)
+            // 索引表满，不分配空间
+            if (g_tlv_ctx.header->tag_count >= TLV_MAX_TAG_COUNT)
             {
-                if (g_tlv_ctx.index_table->entries[i].tag != 0 &&
-                    g_tlv_ctx.index_table->entries[i].tag != 0xFFFF)
-                {
-                    count++;
-                }
-            }
-
-            if (count >= TLV_MAX_TAG_COUNT)
-            {
-                // 索引表满，不分配空间
                 return TLV_ERROR_NO_MEMORY;
             }
         }
