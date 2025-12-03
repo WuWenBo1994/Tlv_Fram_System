@@ -12,8 +12,6 @@
 
 extern uint32_t get_system_time_ms(void);
  
-#define FRAM_DEVICE_ID          0x01  // 你的FRAM设备ID（如果SPI驱动需要）
- 
 /* ============================ FRAM硬件接口实现（适配已有接口） ============================ */
  
 int tlv_port_fram_init(void)

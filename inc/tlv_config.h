@@ -15,10 +15,7 @@
 #define TLV_FRAM_SIZE                (128 * 1024)     // 128KB
  
 /** 支持的最大Tag数量 */
-#define TLV_MAX_TAG_COUNT            256             // 减少到256个
- 
-/** 最大单个数据大小 */
-#define TLV_MAX_DATA_SIZE            (4 * 1024)      // 4KB
+#define TLV_MAX_TAG_COUNT            256          
  
 /** 使用CRC16 */
 #define TLV_USE_CRC16                1
@@ -28,12 +25,15 @@
  
 /** 启用版本兼容迁移 */
 #define TLV_ENABLE_MIGRATION         1
- 
-/** 启动时自动迁移 */
-#define TLV_AUTO_MIGRATE_ON_BOOT     0
- 
+  
 /** 读取时惰性迁移 */
-#define TLV_LAZY_MIGRATE_ON_READ     0
+#define TLV_LAZY_MIGRATE_ON_READ     1
+
+/** 启动时自动批量迁移（可选）*/
+#define TLV_AUTO_MIGRATE_ON_BOOT     0
+
+/** 调试模式     */
+#define TLV_DEBUG                    1
 /* ============================ 内存配置 ============================ */
  
 /** 读写缓冲区大小（静态分配） */
@@ -48,7 +48,7 @@
 #define TLV_INDEX_ADDR               0x0100
  
 /** 数据区起始地址 */
-#define TLV_DATA_ADDR                0x0800
+#define TLV_DATA_ADDR                0x1000
  
 /** 备份区起始地址 */
 #define TLV_BACKUP_ADDR              0x1E000
@@ -56,8 +56,12 @@
 /* ============================ 魔数定义 ============================ */
  
 /** 系统魔数 */
-#define TLV_SYSTEM_MAGIC             0x544C5646  // "TLVF"
- 
+#define DEFAULT_TLV_SYSTEM_MAGIC     0x544C5646  // "TLVF" Default Magic
+#define WRGV_TLV_SYSTEM_MAGIC        0x57524756  // "WRGV"
+#define LRGV_TLV_SYSTEM_MAGIC        0x4C524756  // "LRGV"
+
+#define TLV_SYSTEM_MAGIC             DEFAULT_TLV_SYSTEM_MAGIC
+
 /** 数据块魔数 */
 #define TLV_BLOCK_MAGIC              0x44415441  // "DATA"
  

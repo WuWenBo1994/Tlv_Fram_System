@@ -174,7 +174,13 @@ tlv_state_t tlv_get_state(void)
 }
 
 /* ============================ 数据操作API实现 ============================ */
-
+/**
+ * @brief 写入TLV数据
+ * @param tag Tag值
+ * @param data 数据指针
+ * @param len 数据长度
+ * @return 实际写入长度，负数表示错误
+ */
 int tlv_write(uint16_t tag, const void *data, uint16_t len)
 {
     if (!data || len == 0 || tag == 0)
@@ -308,6 +314,13 @@ int tlv_write(uint16_t tag, const void *data, uint16_t len)
     return len; // 返回写入长度
 }
 
+/**
+ * @brief 读取TLV数据
+ * @param tag Tag值
+ * @param buf 输出缓冲区
+ * @param len 缓冲区大小（输入），实际读取大小（输出）
+ * @return 0: 成功, 其他: 错误码
+ */
 int tlv_read(uint16_t tag, void *buf, uint16_t *len)
 {
     if (!buf || !len || tag == 0 || *len == 0)
@@ -320,6 +333,8 @@ int tlv_read(uint16_t tag, void *buf, uint16_t *len)
         return TLV_ERROR;
     }
 
+    uint16_t outputSize = *len; // 保存输出缓冲区大小
+
     // 查找索引
     tlv_index_entry_t *index = tlv_index_find(&g_tlv_ctx, tag);
     if (!index || !(index->flags & TLV_FLAG_VALID))
@@ -328,35 +343,51 @@ int tlv_read(uint16_t tag, void *buf, uint16_t *len)
     }
 
     // 读取数据块
-    uint16_t read_len = *len;
+    uint16_t read_len = outputSize;
     int ret = read_data_block(index->data_addr, buf, &read_len);
     if (ret != TLV_OK)
     {
         return ret;
     }
 
-#if TLV_ENABLE_MIGRATION
+    // 读取时惰性迁移
+#if (TLV_ENABLE_MIGRATION && TLV_LAZY_MIGRATE_ON_READ)
     // 查找元数据获取期望版本
     const tlv_meta_const_t *meta = get_meta(tag);
     if (meta && index->version < meta->version)
     {
         // 需要升级
-
-        // 迁移数据
-        ret = tlv_migrate_tag(tag, buf, &read_len, index->version);
+        #ifdef TLV_DEBUG
+        printf("Migrating tag 0x%04X on read: v%u -> v%u\n",
+               tag, index->version, meta->version);
+#endif
+        // 迁移数据（原地，在 buf 中）
+        uint16_t old_len = read_len; // 旧数据长度
+        uint16_t new_len = 0;
+        ret = tlv_migrate_tag(tag, buf, old_len, &new_len, outputSize, index->version);
         if (ret == TLV_OK)
         {
-            // 迁移成功，写回FRAM
-            tlv_write(tag, buf, read_len);
-
-            // 更新索引版本
-            index->version = meta->version;
-            tlv_index_save(&g_tlv_ctx);
+           // 迁移成功，写回FRAM
+            int write_ret = tlv_write(tag, buf, new_len);
+            if (write_ret < 0) {
+                // 写回失败，警告但仍返回迁移后的数据
+#ifdef TLV_DEBUG
+                printf("WARNING: Migration successful but write back failed (err: %d)\n",
+                       write_ret);
+#endif
+            }
+ 
+            // 更新返回的数据长度
+            read_len = new_len;
+            // 索引版本已在 tlv_write() 中更新
         }
         else
         {
-            // 迁移失败，返回错误但数据仍可用（旧版本）
-            // 根据策略决定是否继续
+            // 迁移失败，返回错误（数据可能不可用）
+#ifdef TLV_DEBUG
+            printf("ERROR: Migration failed (err: %d)\n", ret);
+#endif
+            return ret;
         }
     }
 #endif
@@ -365,6 +396,11 @@ int tlv_read(uint16_t tag, void *buf, uint16_t *len)
     return TLV_OK;
 }
 
+/**
+ * @brief 删除TLV数据
+ * @param tag Tag值
+ * @return 0: 成功, 其他: 错误码
+ */
 int tlv_delete(uint16_t tag)
 {
     if (tag == 0)
@@ -393,6 +429,11 @@ int tlv_delete(uint16_t tag)
     return ret;
 }
 
+
+/**
+ * @brief 强制保存所有挂起的更改
+ * @return 0: 成功, 其他: 错误码
+ */
 int tlv_flush(void)
 {
     int ret = tlv_index_save(&g_tlv_ctx);
@@ -404,6 +445,11 @@ int tlv_flush(void)
     return system_header_save();
 }
 
+/**
+ * @brief 检查Tag是否存在
+ * @param tag Tag值
+ * @return true: 存在, false: 不存在
+ */
 bool tlv_exists(uint16_t tag)
 {
     if (tag == 0 || g_tlv_ctx.state != TLV_STATE_INITIALIZED)
@@ -415,6 +461,12 @@ bool tlv_exists(uint16_t tag)
     return (entry != NULL && (entry->flags & TLV_FLAG_VALID));
 }
 
+/**
+ * @brief 获取Tag数据长度
+ * @param tag Tag值
+ * @param len 输出长度
+ * @return 0: 成功, 其他: 错误码
+ */
 int tlv_get_length(uint16_t tag, uint16_t *len)
 {
     if (!len || tag == 0)
@@ -446,7 +498,14 @@ int tlv_get_length(uint16_t tag, uint16_t *len)
 }
 
 /* ============================ 批量操作API实现 ============================ */
-
+/**
+ * @brief 批量读取
+ * @param tags Tag数组
+ * @param count Tag数量
+ * @param buffers 缓冲区数组
+ * @param lengths 长度数组
+ * @return 成功读取的数量
+ */
 int tlv_read_batch(const uint16_t *tags, uint16_t count,
                    void **buffers, uint16_t *lengths)
 {
@@ -472,7 +531,14 @@ int tlv_read_batch(const uint16_t *tags, uint16_t count,
 
     return success_count;
 }
-
+/**
+ * @brief 批量写入
+ * @param tags Tag数组
+ * @param count Tag数量
+ * @param datas 数据数组
+ * @param lengths 长度数组
+ * @return 成功写入的数量
+ */
 int tlv_write_batch(const uint16_t *tags, uint16_t count,
                     const void **datas, const uint16_t *lengths)
 {
@@ -504,7 +570,11 @@ int tlv_write_batch(const uint16_t *tags, uint16_t count,
 }
 
 /* ============================ 查询与统计API实现 ============================ */
-
+/**
+ * @brief 获取统计信息
+ * @param stats 统计信息输出
+ * @return 0: 成功, 其他: 错误码
+ */
 int tlv_get_statistics(tlv_statistics_t *stats)
 {
     if (!stats)
@@ -546,7 +616,12 @@ int tlv_get_statistics(tlv_statistics_t *stats)
 
     return TLV_OK;
 }
-
+/**
+ * @brief 遍历所有Tag
+ * @param callback 回调函数
+ * @param user_data 用户数据
+ * @return 遍历的Tag数量
+ */
 int tlv_foreach(tlv_foreach_callback_t callback, void *user_data)
 {
     if (!callback)
@@ -575,7 +650,10 @@ int tlv_foreach(tlv_foreach_callback_t callback, void *user_data)
 }
 
 /* ============================ 维护管理API实现 ============================ */
-
+/**
+ * @brief 碎片整理
+ * @return 0: 成功, 其他: 错误码
+ */
 int tlv_defragment(void)
 {
     if (g_tlv_ctx.state != TLV_STATE_INITIALIZED)
@@ -663,6 +741,11 @@ int tlv_defragment(void)
     return ret;
 }
 
+/**
+ * @brief 校验所有数据
+ * @param corrupted_count 输出损坏数量
+ * @return 0: 成功, 其他: 错误码
+ */
 int tlv_verify_all(uint32_t *corrupted_count)
 {
     if (!corrupted_count)
@@ -748,7 +831,10 @@ int tlv_verify_all(uint32_t *corrupted_count)
 }
 
 /* ============================ 公开函数：对外备份接口（带状态检查）============================ */
-
+/**
+ * @brief 备份所有数据到备份区
+ * @return 0: 成功, 其他: 错误码
+ */
 int tlv_backup_all(void)
 {
     // 对外接口：严格的状态检查
@@ -770,7 +856,10 @@ int tlv_backup_all(void)
 
     return ret;
 }
-
+/**
+ * @brief 从备份区恢复数据
+ * @return 0: 成功, 其他: 错误码
+ */
 int tlv_restore_from_backup(void)
 {
     int ret = TLV_OK;
@@ -813,7 +902,11 @@ int tlv_restore_from_backup(void)
 }
 
 /* ============================ 空间管理API实现 ============================ */
-
+/**
+ * @brief 获取可用空间
+ * @param free_space 输出可用空间
+ * @return 0: 成功, 其他: 错误码
+ */
 int tlv_get_free_space(uint32_t *free_space)
 {
     if (!free_space)
@@ -829,7 +922,11 @@ int tlv_get_free_space(uint32_t *free_space)
     *free_space = g_tlv_ctx.header->free_space;
     return TLV_OK;
 }
-
+/**
+ * @brief 获取已用空间
+ * @param used_space 输出已用空间
+ * @return 0: 成功, 其他: 错误码
+ */
 int tlv_get_used_space(uint32_t *used_space)
 {
     if (!used_space)
@@ -845,7 +942,11 @@ int tlv_get_used_space(uint32_t *used_space)
     *used_space = g_tlv_ctx.header->used_space;
     return TLV_OK;
 }
-
+/**
+ * @brief 计算碎片化程度
+ * @param fragmentation_percent 输出碎片化百分比
+ * @return 0: 成功, 其他: 错误码
+ */
 int tlv_calculate_fragmentation(uint32_t *fragmentation_percent)
 {
     if (!fragmentation_percent)
@@ -874,8 +975,8 @@ int tlv_calculate_fragmentation(uint32_t *fragmentation_percent)
     return TLV_OK;
 }
 
-/* ============================ 私有函数实现 ============================ */
 
+/* ============================ 私有函数实现 ============================ */
 static int system_header_init(void)
 {
     if (!g_tlv_ctx.header)
