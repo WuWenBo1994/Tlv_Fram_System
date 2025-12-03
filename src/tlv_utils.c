@@ -145,17 +145,23 @@ uint32_t tlv_memset_safe(void *dst, uint32_t dst_size,
 
 /* ============================ 版本比较实现 ============================ */
 
-int tlv_version_compare(uint8_t v1, uint8_t v2)
+int tlv_version_compare(uint16_t v1, uint16_t v2)
 {
     if (v1 == v2)
         return 0;
     return (v1 < v2) ? -1 : 1;
 }
 
-bool tlv_version_compatible(uint8_t current, uint8_t required)
+/**
+ * @brief 检查版本兼容性
+ * @param current 当前版本
+ * @param required 要求版本
+ * @return true: 兼容, false: 不兼容
+ */
+bool tlv_version_compatible(uint16_t current, uint16_t required)
 {
     // 主版本必须相同，次版本可以向后兼容
-    return (current >> 4) == (required >> 4) && current >= required;
+    return (current >> 8) == (required >> 8) && current >= required;
 }
 
 /* ============================ 时间工具实现 ============================ */

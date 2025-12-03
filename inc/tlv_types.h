@@ -19,7 +19,8 @@ typedef enum
     TLV_STATE_UNINITIALIZED = 0, // 系统尚未初始化
     TLV_STATE_INITIALIZED,       // 系统准备就绪，可正常运行
     TLV_STATE_ERROR,             // 系统处于错误状态
-    TLV_STATE_FORMATTED          // 系统已格式化但未初始化
+    TLV_STATE_FORMATTED,         // 系统已格式化但未初始化
+    TLV_STATE_FORMATTING         // 系统正在格式化
 } tlv_state_t;
 
 /** 初始化结果枚举 */

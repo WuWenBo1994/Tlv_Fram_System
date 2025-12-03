@@ -8,7 +8,13 @@
 #include "tlv_port.h"
 #include "tlv_utils.h"
 #include "tlv_meta_table.h"
+#include "tlv_migration.h"
 #include <string.h>
+
+#if sizeof(tlv_system_header_t) != 128
+    #error "tlv_system_header_t size must be 128"
+#endif
+
 
 /* ============================ 全局静态变量 ============================ */
 
@@ -52,6 +58,10 @@ tlv_init_result_t tlv_init(void)
     g_tlv_ctx.meta_table = TLV_META_MAP;
     g_tlv_ctx.meta_table_size = TLV_META_MAP_SIZE;
 
+    // 清零header和index_table
+    memset(&g_static_header, 0, sizeof(g_static_header));
+    memset(&g_static_index, 0, sizeof(g_static_index));
+
     // 尝试加载系统Header
     ret = system_header_load();
     if (ret == TLV_OK)
@@ -62,7 +72,7 @@ tlv_init_result_t tlv_init(void)
         {
             goto error_cleanup;
         }
-
+        
         // 加载索引表
         ret = tlv_index_load(&g_tlv_ctx);
         if (ret == TLV_OK)
@@ -123,6 +133,32 @@ int tlv_deinit(void)
 
 int tlv_format(uint32_t magic)
 {
+    // 修复：检查并设置格式化状态
+    if (g_tlv_ctx.state == TLV_STATE_ERROR)
+    {
+        // 允许格式化错误状态
+    }
+    else if (g_tlv_ctx.state == TLV_STATE_INITIALIZED)
+    {
+        // 警告：会丢失所有数据
+#ifdef TLV_DEBUG
+        printf("WARNING: Formatting initialized system - all data will be lost!\n");
+#endif
+    }
+
+    // 设置格式化中状态
+    tlv_state_t old_state = g_tlv_ctx.state;
+    g_tlv_ctx.state = TLV_STATE_FORMATTING;  
+
+    // 确保指针已设置
+    if (!g_tlv_ctx.header || !g_tlv_ctx.index_table)
+    {
+        // 如果还未初始化，先设置指针
+        g_tlv_ctx.header = &g_static_header;
+        g_tlv_ctx.index_table = &g_static_index;
+    }
+    
+
     // 初始化系统Header
     int ret = system_header_init();
     if (ret != TLV_OK)
@@ -246,6 +282,26 @@ int tlv_write(uint16_t tag, const void *data, uint16_t len)
     }
     else
     {
+        if (!index)
+        {
+            // 检查索引表是否满
+            uint32_t count = 0;
+            for (int i = 0; i < TLV_MAX_TAG_COUNT; i++)
+            {
+                if (g_tlv_ctx.index_table->entries[i].tag != 0 &&
+                    g_tlv_ctx.index_table->entries[i].tag != 0xFFFF)
+                {
+                    count++;
+                }
+            }
+
+            if (count >= TLV_MAX_TAG_COUNT)
+            {
+                // 索引表满，不分配空间
+                return TLV_ERROR_NO_MEMORY;
+            }
+        }
+
         // 新Tag，分配空间
         uint32_t total_size = sizeof(tlv_data_block_header_t) + len + 2;
         target_addr = allocate_space(total_size);
@@ -270,6 +326,7 @@ int tlv_write(uint16_t tag, const void *data, uint16_t len)
             }
             else
             {
+                g_tlv_ctx.header->used_space -= new_block_size;
                 g_tlv_ctx.header->used_space += old_block_size;
             }
         }
@@ -290,6 +347,11 @@ int tlv_write(uint16_t tag, const void *data, uint16_t len)
         index = tlv_index_add(&g_tlv_ctx, tag, target_addr);
         if (!index)
         {
+            // 这不应该发生（我们已经检查过）
+            // 但如果发生，需要回滚
+#ifdef TLV_DEBUG
+            printf("CRITICAL: Index add failed unexpectedly!\n");
+#endif
             return TLV_ERROR_NO_MEMORY;
         }
     }
@@ -333,7 +395,7 @@ int tlv_read(uint16_t tag, void *buf, uint16_t *len)
         return TLV_ERROR;
     }
 
-    uint16_t outputSize = *len; // 保存输出缓冲区大小
+    uint16_t output_size = *len; // 保存输出缓冲区大小
 
     // 查找索引
     tlv_index_entry_t *index = tlv_index_find(&g_tlv_ctx, tag);
@@ -343,7 +405,7 @@ int tlv_read(uint16_t tag, void *buf, uint16_t *len)
     }
 
     // 读取数据块
-    uint16_t read_len = outputSize;
+    uint16_t read_len = output_size;
     int ret = read_data_block(index->data_addr, buf, &read_len);
     if (ret != TLV_OK)
     {
@@ -356,27 +418,39 @@ int tlv_read(uint16_t tag, void *buf, uint16_t *len)
     const tlv_meta_const_t *meta = get_meta(tag);
     if (meta && index->version < meta->version)
     {
-        // 需要升级
-        #ifdef TLV_DEBUG
+        // 首先检查缓冲区是否足够大，否则无法迁移
+        if (meta->max_length > output_size)
+        {
+#ifdef TLV_DEBUG
+            printf("ERROR: Buffer too small for migration\n");
+            printf("  Need: %u, Have: %u\n", meta->max_length, output_size);
+#endif
+            return TLV_ERROR_NO_MEMORY;
+        }
+
+// 需要升级
+#ifdef TLV_DEBUG
         printf("Migrating tag 0x%04X on read: v%u -> v%u\n",
                tag, index->version, meta->version);
 #endif
         // 迁移数据（原地，在 buf 中）
         uint16_t old_len = read_len; // 旧数据长度
         uint16_t new_len = 0;
-        ret = tlv_migrate_tag(tag, buf, old_len, &new_len, outputSize, index->version);
+        ret = tlv_migrate_tag(tag, buf, old_len, &new_len, output_size,
+                              index->version);
         if (ret == TLV_OK)
         {
-           // 迁移成功，写回FRAM
+            // 迁移成功，写回FRAM
             int write_ret = tlv_write(tag, buf, new_len);
-            if (write_ret < 0) {
+            if (write_ret < 0)
+            {
                 // 写回失败，警告但仍返回迁移后的数据
 #ifdef TLV_DEBUG
                 printf("WARNING: Migration successful but write back failed (err: %d)\n",
                        write_ret);
 #endif
             }
- 
+
             // 更新返回的数据长度
             read_len = new_len;
             // 索引版本已在 tlv_write() 中更新
@@ -429,7 +503,6 @@ int tlv_delete(uint16_t tag)
     return ret;
 }
 
-
 /**
  * @brief 强制保存所有挂起的更改
  * @return 0: 成功, 其他: 错误码
@@ -480,7 +553,7 @@ int tlv_get_length(uint16_t tag, uint16_t *len)
     }
 
     tlv_index_entry_t *index = tlv_index_find(&g_tlv_ctx, tag);
-    if (!index)
+    if (!index || !(index->flags & TLV_FLAG_VALID))
     {
         return TLV_ERROR_NOT_FOUND;
     }
@@ -561,10 +634,6 @@ int tlv_write_batch(const uint16_t *tags, uint16_t count,
             success_count++;
         }
     }
-
-    // 批量写入后保存索引
-    tlv_index_save(&g_tlv_ctx);
-    system_header_save();
 
     return success_count;
 }
@@ -720,6 +789,10 @@ int tlv_defragment(void)
             entry->data_addr = write_pos;
             entry->flags &= ~TLV_FLAG_DIRTY;
         }
+        else if (entry->flags & TLV_FLAG_DIRTY)
+        {
+            entry->flags &= ~TLV_FLAG_DIRTY;
+        }
 
         write_pos += block_size;
         total_used += block_size;
@@ -862,8 +935,54 @@ int tlv_backup_all(void)
  */
 int tlv_restore_from_backup(void)
 {
-    int ret = TLV_OK;
-    uint32_t backup_size = TLV_BACKUP_ADDR - TLV_HEADER_ADDR;
+    if (!g_tlv_ctx.header || !g_tlv_ctx.index_table)
+    {
+        return TLV_ERROR_INVALID_PARAM;
+    }
+
+    int ret;
+    tlv_system_header_t backup_header;
+    // 读取备份Header
+    ret = tlv_port_fram_read(TLV_BACKUP_ADDR, &backup_header,
+                             sizeof(backup_header));
+    if (ret != TLV_OK)
+    {
+        return ret;
+    }
+
+    // 验证备份Header
+    if (backup_header.magic != TLV_SYSTEM_MAGIC)
+    {
+#ifdef TLV_DEBUG
+        printf("ERROR: Backup header magic invalid (0x%08lX)\n",
+               (unsigned long)backup_header.magic);
+#endif
+        return TLV_ERROR_CORRUPTED;
+    }
+
+    // 验证CRC
+    uint16_t calc_crc = tlv_crc16(&backup_header,
+                                  sizeof(backup_header) - sizeof(uint16_t));
+    if (calc_crc != backup_header.header_crc16)
+    {
+#ifdef TLV_DEBUG
+        printf("ERROR: Backup header CRC mismatch\n");
+#endif
+        return TLV_ERROR_CORRUPTED;
+    }
+
+    // 验证数据合理性
+    if (backup_header.data_region_size !=
+        (TLV_BACKUP_ADDR - TLV_DATA_ADDR))
+    {
+#ifdef TLV_DEBUG
+        printf("ERROR: Backup header data size mismatch\n");
+#endif
+        return TLV_ERROR_CORRUPTED;
+    }
+
+    // 计算备份区大小
+    uint32_t backup_size = TLV_DATA_REGION_SIZE;
 
     // 分批恢复
     uint32_t offset = 0;
@@ -975,7 +1094,6 @@ int tlv_calculate_fragmentation(uint32_t *fragmentation_percent)
     return TLV_OK;
 }
 
-
 /* ============================ 私有函数实现 ============================ */
 static int system_header_init(void)
 {
@@ -987,7 +1105,7 @@ static int system_header_init(void)
     memset(g_tlv_ctx.header, 0, sizeof(tlv_system_header_t));
 
     g_tlv_ctx.header->magic = TLV_SYSTEM_MAGIC;
-    g_tlv_ctx.header->version = 0x0100;
+    g_tlv_ctx.header->version = TLV_SYSTEM_VERSION;
     g_tlv_ctx.header->tag_count = 0;
     g_tlv_ctx.header->data_region_start = TLV_DATA_ADDR;
     g_tlv_ctx.header->data_region_size = TLV_BACKUP_ADDR - TLV_DATA_ADDR;
@@ -1050,6 +1168,12 @@ static int system_header_verify(void)
     if (g_tlv_ctx.header->magic != TLV_SYSTEM_MAGIC)
     {
         return TLV_ERROR_CORRUPTED;
+    }
+
+    // 检查版本兼容性，主版本必须相同，当前子版本大于文件系统版本
+    if (!tlv_version_compatible(TLV_SYSTEM_VERSION, g_tlv_ctx.header->version))
+    {
+        return TLV_ERROR_VERSION;
     }
 
     // 校验CRC16

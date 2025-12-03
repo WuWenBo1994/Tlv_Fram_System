@@ -54,12 +54,12 @@ static const tlv_meta_const_t *get_meta(uint16_t tag)
  * @note 迁移函数必须能够在同一缓冲区中完成转换
  *       如果需要临时空间，使用栈上的小变量（<256B）
  */
-static int tlv_migrate_tag(uint16_t tag,
-                           void *data,
-                           uint16_t old_len,
-                           uint16_t *new_len,
-                           uint16_t max_size,
-                           uint8_t current_ver)
+int tlv_migrate_tag(uint16_t tag,
+                    void *data,
+                    uint16_t old_len,
+                    uint16_t *new_len,
+                    uint16_t max_size,
+                    uint8_t current_ver)
 {
     if (!data || !new_len || max_size == 0)
     {

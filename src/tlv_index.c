@@ -29,21 +29,13 @@ static bool is_tag_region_valid(uint16_t tag, uint32_t addr, uint32_t size);
  */
 int tlv_index_init(tlv_context_t *ctx)
 {
-    if (!ctx)
+    if (!ctx || !ctx->header || !ctx->index_table)
     {
         return TLV_ERROR_INVALID_PARAM;
     }
 
-    // 使用静态分配的内存
-    static tlv_system_header_t static_header;
-    static tlv_index_table_t static_index;
-
-    ctx->header = &static_header;
-    ctx->index_table = &static_index;
-
     // 清零
-    memset(&static_header, 0, sizeof(static_header));
-    memset(&static_index, 0, sizeof(static_index));
+    memset(ctx->index_table, 0, sizeof(tlv_index_table_t));
 
     return TLV_OK;
 }
@@ -318,17 +310,16 @@ tlv_index_entry_t *tlv_index_add(tlv_context_t *ctx, uint16_t tag, uint32_t addr
     entry->flags = TLV_FLAG_VALID;
     entry->version = meta ? meta->version : 1;
 
-    // 更新上下文中的标签计数器
-    ctx->header->tag_count++;
-
     // 检查区域有效性（编译时检查的运行时验证）
     if (meta && !is_tag_region_valid(tag, addr, meta->max_length + 20))
     {
         // 区域无效时进行回滚操作：清空条目并减少标签计数
         memset(entry, 0, sizeof(tlv_index_entry_t));
-        ctx->header->tag_count--;
         return NULL;
     }
+
+    // 更新上下文中的标签计数器
+    ctx->header->tag_count++;
 
     return entry;
 }
@@ -363,7 +354,6 @@ int tlv_index_update(tlv_context_t *ctx, uint16_t tag, uint32_t addr)
     const tlv_meta_const_t * meta = find_meta_by_tag(tag);
     entry->data_addr = addr;
     entry->flags |= TLV_FLAG_VALID;
-    entry->flags &= ~TLV_FLAG_DIRTY;
     entry->version = meta ? meta->version : 1;
 
     return TLV_OK;
@@ -384,14 +374,14 @@ int tlv_index_remove(tlv_context_t *ctx, uint16_t tag)
     }
 
     // 查找要删除的索引项
-    tlv_index_entry_t *entry = tlv_index_find(ctx, tag);
-    if (!entry)
+    tlv_index_entry_t *index  = tlv_index_find(ctx, tag);
+    if (!index || !(index->flags & TLV_FLAG_VALID))
     {
         return TLV_ERROR_NOT_FOUND;
     }
 
     // 清空索引项
-    memset(entry, 0, sizeof(tlv_index_entry_t));
+    memset(index, 0, sizeof(tlv_index_entry_t));
 
     // 更新Tag计数
     if (ctx->header->tag_count > 0)
