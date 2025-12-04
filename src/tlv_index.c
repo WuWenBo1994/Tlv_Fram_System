@@ -79,16 +79,14 @@ int tlv_index_load(tlv_context_t *ctx)
     }
 
     // 从FRAM读取索引表
-    int ret = tlv_port_fram_read(TLV_INDEX_ADDR, ctx->index_table,
-                                 sizeof(tlv_index_table_t));
+    int ret = tlv_port_fram_read(TLV_INDEX_ADDR, ctx->index_table, sizeof(tlv_index_table_t));
     if (ret != TLV_OK)
     {
         return ret;
     }
 
     // 校验索引表CRC16
-    uint16_t calc_crc = tlv_crc16(ctx->index_table->entries,
-                                  sizeof(ctx->index_table->entries));
+    uint16_t calc_crc = tlv_crc16(ctx->index_table->entries, sizeof(ctx->index_table->entries));
     if (calc_crc != ctx->index_table->index_crc16)
     {
         return TLV_ERROR_CRC_FAILED;
@@ -142,8 +140,7 @@ int tlv_index_verify(tlv_context_t *ctx)
     }
 
     // 计算CRC并对比
-    uint16_t calc_crc = tlv_crc16(ctx->index_table->entries,
-                                  sizeof(ctx->index_table->entries));
+    uint16_t calc_crc = tlv_crc16(ctx->index_table->entries, sizeof(ctx->index_table->entries));
 
     if (calc_crc != ctx->index_table->index_crc16)
     {
@@ -264,7 +261,24 @@ tlv_index_entry_t *tlv_index_find_free_slot(tlv_context_t *ctx)
             return &ctx->index_table->entries[i];
         }
     }
+	
+	// 如果没有空槽位，可以选择复用脏槽位
+	for (int i = 0; i < TLV_MAX_TAG_COUNT; i++) 
+	{
+		if ((ctx->index_table->entries[i].flags & TLV_FLAG_DIRTY) && 
+			!(ctx->index_table->entries[i].flags & TLV_FLAG_VALID)) 
+		{
+			// 清空脏块槽位，复用
+			memset(&ctx->index_table->entries[i], 0, sizeof(tlv_index_entry_t));
+			if(ctx->header->fragment_count > 0)
+			{
+				ctx->header->fragment_count--;  // 减少计数
+			}
+			return &ctx->index_table->entries[i];
+		}
+	}
 
+	// 真的没有槽位了
     return NULL;
 }
 
@@ -309,7 +323,7 @@ tlv_index_entry_t *tlv_index_add(tlv_context_t *ctx, uint16_t tag, uint32_t addr
     entry->version = meta ? meta->version : 1;
 
     // 检查区域有效性（编译时检查的运行时验证）
-    if (meta && !is_tag_region_valid(tag, addr, meta->max_length + 20))
+    if (meta && !is_tag_region_valid(tag, addr, meta->max_length))
     {
         // 区域无效时进行回滚操作：清空条目并减少标签计数
         memset(entry, 0, sizeof(tlv_index_entry_t));
@@ -352,6 +366,7 @@ int tlv_index_update(tlv_context_t *ctx, uint16_t tag, uint32_t addr)
     const tlv_meta_const_t * meta = find_meta_by_tag(tag);
     entry->data_addr = addr;
     entry->flags |= TLV_FLAG_VALID;
+	entry->flags &= ~TLV_FLAG_DIRTY;
     entry->version = meta ? meta->version : 1;
 
     return TLV_OK;
@@ -378,8 +393,9 @@ int tlv_index_remove(tlv_context_t *ctx, uint16_t tag)
         return TLV_ERROR_NOT_FOUND;
     }
 
-    // 清空索引项
+	// 清空索引项
     memset(index, 0, sizeof(tlv_index_entry_t));
+	
 
     // 更新Tag计数
     if (ctx->header->tag_count > 0)
@@ -438,22 +454,6 @@ static bool is_tag_region_valid(uint16_t tag, uint32_t addr, uint32_t size)
     if (!TLV_IS_VALID_ADDR(addr) || !TLV_IS_SIZE_SAFE(addr, size))
     {
         return false;
-    }
-
-    // 检查是否与现有Tag区域冲突
-    for (uint32_t i = 0; i < TLV_META_MAP_SIZE; i++)
-    {
-        if (TLV_META_MAP[i].tag != 0xFFFF && TLV_META_MAP[i].tag != tag)
-        {
-            uint32_t other_addr = TLV_DATA_ADDR;                   // 这里简化处理
-            uint32_t other_size = TLV_META_MAP[i].max_length + 20; // Header+Data+CRC
-
-            // 检测区域重叠情况
-            if (TLV_REGIONS_OVERLAP(addr, size, other_addr, other_size))
-            {
-                return false;
-            }
-        }
     }
 
     return true;

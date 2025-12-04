@@ -60,7 +60,9 @@ typedef struct
     uint32_t last_update_time;  // 最后更新时间戳
     uint32_t free_space;        // 可用空间
     uint32_t used_space;        // 已用空间
-    uint8_t reserved[90];       // 保留扩展
+	uint32_t fragment_count;	// 碎片的数量
+	uint32_t fragment_size;		// 碎片的大小
+    uint8_t reserved[82];       // 保留扩展
     uint16_t header_crc16;      // Header自身CRC16（改为2字节）
 } tlv_system_header_t;
 
@@ -73,16 +75,17 @@ typedef struct
     uint8_t version;    // 数据版本号
     uint32_t data_addr; // 数据块在FRAM中的绝对地址
 } tlv_index_entry_t;
-
-/** Tag索引表结构（简化，1026字节） */
+#pragma pack()
+#pragma pack(1)
+/** Tag索引表结构（简化，2050字节） */
 typedef struct 
 {
     tlv_index_entry_t entries[TLV_MAX_TAG_COUNT];
     uint16_t index_crc16; // 索引表CRC16
 } tlv_index_table_t;
-
+#pragma pack()
 /* ============================ 数据块结构 ============================ */
-
+#pragma pack(1)
 /** TLV数据块Header结构（14字节，CRC16版本） */
 typedef struct 
 {
@@ -93,7 +96,7 @@ typedef struct
     uint32_t timestamp;   // 写入时间戳
     uint32_t write_count; // 写入计数
 } tlv_data_block_header_t;
-
+#pragma pack()
 /** 完整的TLV数据块,永远不会实例化这个数组，仅表示数据结构 */
 typedef struct 
 {
@@ -173,7 +176,7 @@ typedef struct
     uint32_t fragmentation;    // 碎片化程度
     uint32_t corruption_count; // 损坏计数
 } tlv_statistics_t;
-#pragma pack()
+
 /* ============================ 地址范围检查宏 ============================ */
 
 /** 检查地址是否在有效范围内 */
