@@ -44,7 +44,7 @@ const int TLV_META_MAP_SIZE = (sizeof(TLV_META_MAP) / sizeof(TLV_META_MAP[0])) -
 
 /**
  * @brief 根据TLV标签值获取对应的标签名称
- * 
+ *
  * @param tag 要查询的TLV标签值
  * @return 返回标签对应的名称字符串，如果未找到或名称为空则返回"Unknown"
  */
@@ -65,7 +65,7 @@ const char *tlv_get_tag_name(uint16_t tag)
 
 /**
  * @brief 根据标签值获取对应TLV项的最大长度
- * 
+ *
  * @param tag 要查询的标签值
  * @return 返回对应标签的最大长度，如果未找到则返回0
  */
@@ -86,7 +86,7 @@ uint16_t tlv_get_tag_max_length(uint16_t tag)
 
 /**
  * @brief 根据名称查找对应的TLV标签值
- * 
+ *
  * @param name 要查找的TLV项名称
  * @return 返回找到的标签值，如果未找到或输入为空则返回0xFFFF
  */

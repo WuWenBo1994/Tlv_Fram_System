@@ -10,7 +10,6 @@
 #include "tlv_meta_table.h"
 #include "tlv_migration.h"
 #include <string.h>
-#include "Main.h"
 
 /* ===================== TLV系统头结构体大小检查 ======================== */
 
@@ -851,7 +850,6 @@ int tlv_defragment(void)
     int ret = TLV_OK;
     uint32_t write_pos = TLV_DATA_ADDR;
     uint32_t total_used = 0;
-    uint32_t processed = 0;
     uint32_t total_tags = 0;
 
     // 统计有效tag数量
