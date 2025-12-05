@@ -1,3 +1,13 @@
+
+
+
+
+
+
+
+
+# TLV状态机
+
 ## 1. 状态机详解
 
 ### 状态定义和含义
@@ -35,7 +45,7 @@ typedef enum {
                  │
         需要调用 tlv_format()
                  ↓
-            [FORMATTED] → 可以正常使用 → [INITIALIZED]
+            [FORMATTED] → tlv_init() 可以正常使用 → [INITIALIZED]
 
 
 [ERROR] → 需要手动修复或重新格式化
@@ -147,10 +157,9 @@ tlv_format(0);
 ```C
 tlv_format(0);
 // 此时状态为 TLV_STATE_FORMATTED 
-
-// 第一次写入后自动变为 INITIALIZED
-tlv_write(TAG_SYSTEM_CONFIG, data, len);
+tlv_init();
 // 现在状态为 TLV_STATE_INITIALIZED
+tlv_write(TAG_SYSTEM_CONFIG, data, len);
 ```
 
 **特征**：
@@ -181,17 +190,17 @@ void first_boot_example(void)
     tlv_init_result_t result = tlv_init();
   
     if (result == TLV_INIT_FIRST_BOOT) {
-        tlv_printf("First boot detected, formatting...\n");
+        printf("First boot detected, formatting...\n");
       
         // 使用默认魔数（TLV_SYSTEM_MAGIC）
         int ret = tlv_format(0);
       
         if (ret == TLV_OK) {
-            tlv_printf("Format successful!\n");
+            printf("Format successful!\n");
             // 现在可以写入数据
             tlv_write(TAG_SYSTEM_CONFIG, &config, sizeof(config));
         } else {
-            tlv_printf("Format failed: %d\n", ret);
+            printf("Format failed: %d\n", ret);
         }
     }
 }
@@ -205,11 +214,11 @@ void corruption_recovery_example(void)
     tlv_init_result_t result = tlv_init();
   
     if (result == TLV_INIT_ERROR) {
-        tlv_printf("System corrupted!\n");
+        printf("System corrupted!\n");
       
         // 尝试恢复
         if (tlv_restore_from_backup() != TLV_OK) {
-            tlv_printf("Backup restore failed, formatting...\n");
+            printf("Backup restore failed, formatting...\n");
           
             // 最后手段：格式化（会丢失所有数据）
             tlv_format(0);
@@ -223,8 +232,8 @@ void corruption_recovery_example(void)
 ```C
 void factory_reset_example(void)
 {
-    tlv_printf("Factory reset requested\n");
-    tlv_printf("Are you sure? (y/n): ");
+    printf("Factory reset requested\n");
+    printf("Are you sure? (y/n): ");
   
     char input = getchar();
     if (input == 'y') {
@@ -239,7 +248,7 @@ void factory_reset_example(void)
         // 恢复重要数据
         tlv_write(TAG_SYSTEM_SERIAL_NUMBER, serial, len);
       
-        tlv_printf("Factory reset complete\n");
+        printf("Factory reset complete\n");
     }
 }
 ```
@@ -491,7 +500,7 @@ void boot_sequence(void)
           
         case TLV_INIT_RECOVERED:
             // 已从备份恢复
-            tlv_printf("WARNING: Restored from backup\n");
+            printf("WARNING: Restored from backup\n");
             break;
           
         case TLV_INIT_FIRST_BOOT:
@@ -501,7 +510,7 @@ void boot_sequence(void)
           
         case TLV_INIT_ERROR:
             // 备份也失败了
-            tlv_printf("FATAL: Cannot recover, need format\n");
+            printf("FATAL: Cannot recover, need format\n");
             break;
     }
 }
@@ -513,7 +522,7 @@ void boot_sequence(void)
 void firmware_upgrade_example(void)
 {
     // 升级前备份
-    tlv_printf("Backing up before upgrade...\n");
+    printf("Backing up before upgrade...\n");
     tlv_backup_all();
   
     // 执行固件升级
@@ -522,7 +531,7 @@ void firmware_upgrade_example(void)
     // 升级后验证
     uint32_t corrupted = 0;
     if (tlv_verify_all(&corrupted) != TLV_OK || corrupted > 0) {
-        tlv_printf("Data corrupted after upgrade, restoring...\n");
+        printf("Data corrupted after upgrade, restoring...\n");
         tlv_restore_from_backup();
     }
 }
@@ -572,34 +581,34 @@ void recommended_backup_strategy(void)
 void complete_lifecycle_example(void)
 {
     // ========== 启动阶段 ==========
-    tlv_printf("=== System Boot ===\n");
+    printf("=== System Boot ===\n");
     tlv_init_result_t result = tlv_init();
   
     switch (result) {
         case TLV_INIT_FIRST_BOOT:
-            tlv_printf("First boot, formatting...\n");
+            printf("First boot, formatting...\n");
             tlv_format(0);
             // 状态：FORMATTED → INITIALIZED
             break;
           
         case TLV_INIT_OK:
-            tlv_printf("System OK\n");
+            printf("System OK\n");
             // 状态：INITIALIZED
             break;
           
         case TLV_INIT_RECOVERED:
-            tlv_printf("Recovered from backup\n");
+            printf("Recovered from backup\n");
             // 状态：INITIALIZED
             break;
           
         case TLV_INIT_ERROR:
-            tlv_printf("FATAL ERROR\n");
+            printf("FATAL ERROR\n");
             // 状态：ERROR
             return;
     }
   
     // ========== 正常使用阶段 ==========
-    tlv_printf("\n=== Normal Operation ===\n");
+    printf("\n=== Normal Operation ===\n");
   
     uint32_t config = 0x12345678;
     tlv_write(TAG_SYSTEM_CONFIG, &config, sizeof(config));
@@ -608,32 +617,32 @@ void complete_lifecycle_example(void)
     tlv_backup_all();
   
     // ========== 模拟错误 ==========
-    tlv_printf("\n=== Simulating Corruption ===\n");
+    printf("\n=== Simulating Corruption ===\n");
   
     // 人为破坏Header（测试用）
     uint8_t garbage[256] = {0};
     tlv_port_fram_write(TLV_HEADER_ADDR, garbage, 256);
   
     // 重新初始化
-    tlv_printf("\n=== Reinitialize ===\n");
+    printf("\n=== Reinitialize ===\n");
     result = tlv_init();
   
     if (result == TLV_INIT_ERROR) {
-        tlv_printf("Header corrupted, trying backup...\n");
+        printf("Header corrupted, trying backup...\n");
         if (tlv_restore_from_backup() == TLV_OK) {
-            tlv_printf("Restore successful!\n");
+            printf("Restore successful!\n");
             // 验证数据
             uint32_t read_config;
             uint16_t len = sizeof(read_config);
             tlv_read(TAG_SYSTEM_CONFIG, &read_config, &len);
-            tlv_printf("Config recovered: 0x%08lX\n", (unsigned long)read_config);
+            printf("Config recovered: 0x%08lX\n", (unsigned long)read_config);
         }
     }
   
     // ========== 工厂复位 ==========
-    tlv_printf("\n=== Factory Reset ===\n");
+    printf("\n=== Factory Reset ===\n");
     tlv_format(0);
-    tlv_printf("All data erased\n");
+    printf("All data erased\n");
 }
 ```
 
@@ -650,11 +659,11 @@ int safe_operation(void)
             return TLV_OK;
           
         case TLV_STATE_UNINITIALIZED:
-            tlv_printf("ERROR: System not initialized, call tlv_format() first\n");
+            printf("ERROR: System not initialized, call tlv_format() first\n");
             return TLV_ERROR;
           
         case TLV_STATE_ERROR:
-            tlv_printf("ERROR: System in error state, try restore or format\n");
+            printf("ERROR: System in error state, try restore or format\n");
             return TLV_ERROR;
           
         default:
@@ -682,3 +691,25 @@ int safe_operation(void)
 - **tlv_backup_all()**：备份Header+Index到备份区
 - **tlv_restore_from_backup()**：从备份区恢复
 - **建议**：关键操作前备份，定期自动备份
+
+
+
+# 核心API函数
+
+## 初始化  **tlv_init()**
+
+
+
+## 格式化  **tlv_format()**
+
+
+
+## 碎片整理  **tlv_defragment()**
+
+
+
+## 数据写入 tlv_write()
+
+
+
+## 数据读取 tlv_read()

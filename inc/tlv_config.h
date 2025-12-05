@@ -8,7 +8,7 @@
  
 #include <stdint.h>
 #include <stdbool.h>
-
+ 
 /* ============================ 版本信息 ============================ */
 #define TLV_FILE_SYSTEM_VERSION_MAJOR   0
 #define TLV_FILE_SYSTEM_VERSION_MINOR   1
@@ -83,7 +83,7 @@
 #define WRGV_TLV_SYSTEM_MAGIC        0x57524756  // "WRGV"
 #define LRGV_TLV_SYSTEM_MAGIC        0x4C524756  // "LRGV"
 
-#define TLV_SYSTEM_MAGIC             WRGV_TLV_SYSTEM_MAGIC
+#define TLV_SYSTEM_MAGIC             DEFAULT_TLV_SYSTEM_MAGIC
 
 /** 数据块魔数 */
 #define TLV_BLOCK_MAGIC              0x44415441  // "DATA"

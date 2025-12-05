@@ -1,6 +1,8 @@
 #ifndef __SYSTEM_CONFIG_VERSIONS_H
 #define __SYSTEM_CONFIG_VERSIONS_H
 
+#include <stdint.h>
+
 // V1: 8字节
 typedef struct
 {

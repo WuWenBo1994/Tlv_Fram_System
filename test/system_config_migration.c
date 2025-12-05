@@ -37,6 +37,7 @@ int migrate_system_config_v1_to_v2(void *data,
 
     if (max_size < sizeof(system_config_v2_t))
     {
+		*new_len = sizeof(system_config_v2_t);
         return TLV_ERROR_NO_MEMORY;
     }
 
@@ -96,13 +97,14 @@ int migrate_system_config_v2_to_v3(void *data,
                                    uint8_t new_ver)
 {
     // 参数检查
-    if (old_len < sizeof(system_config_v1_t))
+    if (old_len < sizeof(system_config_v2_t))
     {
         return TLV_ERROR_INVALID_PARAM;
     }
 
-    if (max_size < sizeof(system_config_v2_t))
+    if (max_size < sizeof(system_config_v3_t))
     {
+		*new_len = sizeof(system_config_v3_t);
         return TLV_ERROR_NO_MEMORY;
     }
 
