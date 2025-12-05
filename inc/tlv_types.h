@@ -61,7 +61,7 @@ typedef struct
     uint32_t used_space;        // 已用空间
 	uint32_t fragment_count;	// 碎片的数量
 	uint32_t fragment_size;		// 碎片的大小
-    uint8_t reserved[82];       // 保留扩展
+    uint8_t reserved[210];       // 保留扩展
     uint16_t header_crc16;      // Header自身CRC16（改为2字节）
 } tlv_system_header_t;
 

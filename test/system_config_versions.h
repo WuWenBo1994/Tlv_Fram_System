@@ -42,8 +42,6 @@ typedef struct
     uint8_t reserved[7];
 } system_config_v3_t;
 
-
-
 int migrate_system_config(void *data,
                           uint16_t old_len,
                           uint16_t *new_len,

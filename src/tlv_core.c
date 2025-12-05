@@ -12,7 +12,7 @@
 
 /* ===================== TLV系统头结构体大小检查 ======================== */
 
-STATIC_CHECK_SIZE(tlv_system_header_t, 128);
+STATIC_CHECK_SIZE(tlv_system_header_t, 256);
 STATIC_CHECK_SIZE(tlv_data_block_header_t, 14);
 STATIC_CHECK_SIZE(tlv_index_entry_t, 8);
 STATIC_CHECK_SIZE(tlv_index_table_t, 2050);
