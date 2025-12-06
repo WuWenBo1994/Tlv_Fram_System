@@ -410,10 +410,10 @@ int tlv_read(uint16_t tag, void *buf, uint16_t *len)
 
 读写操作与多个系统组件集成：
 
-- **[批处理操作](https://zread.ai/WuWenBo1994/Tlv_Fram_System/7-batch-operations)**：用于高效处理多个项目
-- **[数据删除和管理](https://zread.ai/WuWenBo1994/Tlv_Fram_System/8-data-deletion-and-management)**：用于空间回收
-- **[CRC 验证和错误处理](https://zread.ai/WuWenBo1994/Tlv_Fram_System/12-crc-validation-and-error-handling)**：用于数据完整性
-- **[版本迁移和兼容性](https://zread.ai/WuWenBo1994/Tlv_Fram_System/17-version-migration-and-compatibility)**：用于格式演进
+- **[批处理操作]**：用于高效处理多个项目
+- **[数据删除和管理]**：用于空间回收
+- **[CRC 验证和错误处理]**：用于数据完整性
+- **[版本迁移和兼容性]**：用于格式演进
 
 ## 最佳实践
 
@@ -485,7 +485,7 @@ const void **datas, const uint16_t *lengths);
 
 ### 实现策略
 
-与批量读取类似，写入操作会遍历每个条目并调用单独的 `tlv_write()` 函数 [src/tlv_core.c#L688-L710](https://zread.ai/WuWenBo1994/Tlv_Fram_System/src/tlv_core.c#L688-L710)。这种方法在保持数据完整性的同时，为多次写入提供了便捷的接口。
+与批量读取类似，写入操作会遍历每个条目并调用单独的 `tlv_write()` 函数 [src/tlv_core.c#L688-L710]。这种方法在保持数据完整性的同时，为多次写入提供了便捷的接口。
 
 ### 性能考虑
 
@@ -514,7 +514,7 @@ buffers[2] = &read_offsets[2];
 int read_count = tlv_read_batch(tags, 3, buffers, read_lengths);
 ```
 
-此示例来自测试套件，展示了传感器配置场景中批处理操作的典型使用模式 [test/tlv_simple_example.c#L40-L50](https://zread.ai/WuWenBo1994/Tlv_Fram_System/test/tlv_simple_example.c#L40-L50)。
+此示例来自测试套件，展示了传感器配置场景中批处理操作的典型使用模式 [test/tlv_simple_example.c#L40-L50]。
 
 ## API 对比
 
@@ -530,7 +530,7 @@ int read_count = tlv_read_batch(tags, 3, buffers, read_lengths);
 
 ![image-20251206140331201](docs/image-20251206140331201.png)
 
-批处理操作层位于核心 TLV 操作之上，提供便捷的接口，同时利用所有底层系统功能，包括索引管理、数据验证和错误处理 [inc/tlv_fram.h#L89-L104](https://zread.ai/WuWenBo1994/Tlv_Fram_System/inc/tlv_fram.h#L89-L104)。
+批处理操作层位于核心 TLV 操作之上，提供便捷的接口，同时利用所有底层系统功能，包括索引管理、数据验证和错误处理 [inc/tlv_fram.h#L89-L104]。
 
 ## 最佳实践
 
@@ -553,7 +553,7 @@ TLV FRAM 中的删除过程采用**惰性删除**策略结合**基于索引的�
 
 ### 单标签删除
 
-主要删除机制通过 `tlv_delete()` 函数实现 [tlv_fram.h](https://zread.ai/WuWenBo1994/Tlv_Fram_System/inc/tlv_fram.h#L64-L69)：
+主要删除机制通过 `tlv_delete()` 函数实现 [tlv_fram.h]：
 
 ```c++
 int tlv_delete(uint16_t tag);
@@ -561,18 +561,18 @@ int tlv_delete(uint16_t tag);
 
 **删除流程**：
 
-1. **验证**：检查有效标签和系统状态 [tlv_core.c](https://zread.ai/WuWenBo1994/Tlv_Fram_System/src/tlv_core.c#L536-L540)
-2. **索引查找**：使用 `tlv_index_find()` 定位标签的索引条目 [tlv_core.c](https://zread.ai/WuWenBo1994/Tlv_Fram_System/src/tlv_core.c#L543-L547)
-3. **块大小计算**：读取数据块头部以确定确切的内存占用 [tlv_core.c](https://zread.ai/WuWenBo1994/Tlv_Fram_System/src/tlv_core.c#L550-L556)
-4. **统计更新**：更新已用空间和碎片计数器 [tlv_core.c](https://zread.ai/WuWenBo1994/Tlv_Fram_System/src/tlv_core.c#L558-L562)
-5. **索引移除**：通过 `tlv_index_remove()` 清除索引条目 [tlv_core.c](https://zread.ai/WuWenBo1994/Tlv_Fram_System/src/tlv_core.c#L565-L569)
-6. **持久化**：保存索引表和系统头部以防止"幽灵数据" [tlv_core.c](https://zread.ai/WuWenBo1994/Tlv_Fram_System/src/tlv_core.c#L571-L576)
+1. **验证**：检查有效标签和系统状态 [tlv_core.c]
+2. **索引查找**：使用 `tlv_index_find()` 定位标签的索引条目 [tlv_core.c]
+3. **块大小计算**：读取数据块头部以确定确切的内存占用 [tlv_core.c]
+4. **统计更新**：更新已用空间和碎片计数器 [tlv_core.c]
+5. **索引移除**：通过 `tlv_index_remove()` 清除索引条目 [tlv_core.c]
+6. **持久化**：保存索引表和系统头部以防止"幽灵数据" [tlv_core.c]
 
 删除过程会立即持久化索引表和系统头部，以防止孤立数据块。这确保了即使在删除操作期间发生断电，也能保持数据一致性。
 
 ### 索引管理
 
-索引移除过程有效地清除标签条目，同时保持表完整性 [tlv_index.c](https://zread.ai/WuWenBo1994/Tlv_Fram_System/src/tlv_index.c#L387-L422)：
+索引移除过程有效地清除标签条目，同时保持表完整性 [tlv_index.c]：
 
 ```c++
 int tlv_index_remove(tlv_context_t *ctx, uint16_t tag)
@@ -595,12 +595,12 @@ int tlv_index_remove(tlv_context_t *ctx, uint16_t tag)
 
 ### 碎片跟踪
 
-系统在系统头部维护详细的碎片统计信息 [tlv_types.h](https://zread.ai/WuWenBo1994/Tlv_Fram_System/inc/tlv_types.h#L58-L59)：
+系统在系统头部维护详细的碎片统计信息 [tlv_types.h]：
 
 - **fragment_count**：产生间隙的已删除数据块数量
 - **fragment_size**：碎片块占用的总内存
 
-碎片计算提供实时内存效率指标 [tlv_core.c](https://zread.ai/WuWenBo1994/Tlv_Fram_System/src/tlv_core.c#L1274-L1302)：
+碎片计算提供实时内存效率指标 [tlv_core.c]：
 
 ```c++
 int tlv_calculate_fragmentation(uint32_t *fragmentation_percent)
@@ -616,14 +616,14 @@ int tlv_calculate_fragmentation(uint32_t *fragmentation_percent)
 
 ### 碎片整理过程
 
-当碎片达到不可接受的水平时，系统通过 `tlv_defragment()` 执行全面的内存压缩 [tlv_core.c](https://zread.ai/WuWenBo1994/Tlv_Fram_System/src/tlv_core.c#L861-L1026)：
+当碎片达到不可接受的水平时，系统通过 `tlv_defragment()` 执行全面的内存压缩 [tlv_core.c]：
 
 **碎片整理策略**：
 
-1. **索引排序**：按数据地址对索引表排序以便顺序处理 [tlv_core.c](https://zread.ai/WuWenBo1994/Tlv_Fram_System/src/tlv_core.c#L879-L893)
-2. **顺序压缩**：移动有效数据块以消除间隙 [tlv_core.c](https://zread.ai/WuWenBo1994/Tlv_Fram_System/src/tlv_core.c#L918-L950)
-3. **索引更新**：使用新地址更新所有受影响的索引条目 [tlv_core.c](https://zread.ai/WuWenBo1994/Tlv_Fram_System/src/tlv_core.c#L946-L948)
-4. **统计重置**：清除碎片计数器并更新空间指标 [tlv_core.c](https://zread.ai/WuWenBo1994/Tlv_Fram_System/src/tlv_core.c#L952-L960)
+1. **索引排序**：按数据地址对索引表排序以便顺序处理 [tlv_core.c]
+2. **顺序压缩**：移动有效数据块以消除间隙 [tlv_core.c]
+3. **索引更新**：使用新地址更新所有受影响的索引条目 [tlv_core.c]
+4. **统计重置**：清除碎片计数器并更新空间指标 [tlv_core.c]
 
 碎片整理使用分块内存操作来处理嵌入式系统静态缓冲区限制内的大数据块，确保即使在有限的 RAM 下也能可靠运行。
 
@@ -633,19 +633,19 @@ int tlv_calculate_fragmentation(uint32_t *fragmentation_percent)
 
 系统提供全面的空间监控功能：
 
-**可用空间查询** [tlv_core.c](https://zread.ai/WuWenBo1994/Tlv_Fram_System/src/tlv_core.c#L1234-L1248)：
+**可用空间查询** [tlv_core.c]：
 
 ```c++
 int tlv_get_free_space(uint32_t *free_space);
 ```
 
-**已用空间跟踪** [tlv_core.c](https://zread.ai/WuWenBo1994/Tlv_Fram_System/src/tlv_core.c#L1250-L1264)：
+**已用空间跟踪** [tlv_core.c]：
 
 ```c++
 int tlv_get_used_space(uint32_t *used_space);
 ```
 
-**碎片分析** [tlv_core.c](https://zread.ai/WuWenBo1994/Tlv_Fram_System/src/tlv_core.c#L1266-L1302)：
+**碎片分析** [tlv_core.c]：
 
 ```c++
 int tlv_calculate_fragmentation(uint32_t *fragmentation_percent);
@@ -653,7 +653,7 @@ int tlv_calculate_fragmentation(uint32_t *fragmentation_percent);
 
 ### 综合统计
 
-对于详细的系统分析，`tlv_get_statistics()` 函数提供内存利用率和系统健康状态的完整概览 [tlv_fram.h](https://zread.ai/WuWenBo1994/Tlv_Fram_System/inc/tlv_fram.h#L135-L141)：
+对于详细的系统分析，`tlv_get_statistics()` 函数提供内存利用率和系统健康状态的完整概览 [tlv_fram.h]：
 
 | 统计项           | 描述                   | 目的           |
 | ---------------- | ---------------------- | -------------- |
@@ -669,7 +669,7 @@ int tlv_calculate_fragmentation(uint32_t *fragmentation_percent);
 
 ### 标签存在性验证
 
-在尝试删除之前，系统提供高效的标签存在性检查 [tlv_fram.h](https://zread.ai/WuWenBo1994/Tlv_Fram_System/inc/tlv_fram.h#L85-L90)：
+在尝试删除之前，系统提供高效的标签存在性检查 [tlv_fram.h]：
 
 ```c++
 bool tlv_exists(uint16_t tag);
@@ -679,7 +679,7 @@ bool tlv_exists(uint16_t tag);
 
 ### 批量操作
 
-为高效管理多个删除操作，系统支持可将多个删除操作合并到单个事务周期中的批量操作 [tlv_fram.h](https://zread.ai/WuWenBo1994/Tlv_Fram_System/inc/tlv_fram.h#L103-L114)：
+为高效管理多个删除操作，系统支持可将多个删除操作合并到单个事务周期中的批量操作 [tlv_fram.h]：
 
 ```c++
 int tlv_read_batch(const uint16_t *tags, uint16_t count, 
@@ -730,10 +730,10 @@ int tlv_write_batch(const uint16_t *tags, uint16_t count,
 
 数据删除与其他系统管理功能无缝集成：
 
-- **[初始化和格式化](https://zread.ai/WuWenBo1994/Tlv_Fram_System/9-initialization-and-formatting)**：正确的系统设置确保可靠的删除操作
-- **[碎片整理和空间优化](https://zread.ai/WuWenBo1994/Tlv_Fram_System/11-defragmentation-and-space-optimization)**：超越基本删除的全面空间恢复
-- **[备份和恢复系统](https://zread.ai/WuWenBo1994/Tlv_Fram_System/10-backup-and-recovery-systems)**：删除操作期间的数据保护
-- **[统计和监控](https://zread.ai/WuWenBo1994/Tlv_Fram_System/14-statistics-and-monitoring)**：实时查看删除影响
+- **[初始化和格式化]**：正确的系统设置确保可靠的删除操作
+- **[碎片整理和空间优化]**：超越基本删除的全面空间恢复
+- **[备份和恢复系统]**：删除操作期间的数据保护
+- **[统计和监控]**：实时查看删除影响
 
 TLV FRAM 删除系统为资源有限的嵌入式环境提供了强大、高效的数据管理，同时保持高可靠性和性能标准。
 
@@ -785,7 +785,7 @@ TLV 系统初始化遵循多阶段流程，处理从首次设置到错误恢复�
 
 ### 格式化流程
 
-![](Readme.assets/image-20251206142719376.png)
+![](docs/image-20251206142719376.png)
 
 ### 格式化步骤
 
@@ -839,7 +839,6 @@ TLV 系统使用针对 FRAM 特性优化的固定内存布局：
 - **错误恢复**: 适当处理 `TLV_INIT_RECOVERED` 结果
 - **系统重置**: 系统关闭或重启前使用 `tlv_deinit()`
 
-有关完整的操作流程，请参考 [系统状态和生命周期](https://zread.ai/WuWenBo1994/Tlv_Fram_System/3-system-states-and-lifecycle)，有关硬件特定要求，请参阅 [移植和硬件集成](https://zread.ai/WuWenBo1994/Tlv_Fram_System/4-porting-and-hardware-integration)。
 
 初始化和格式化子系统为可靠的 TLV 数据操作提供了基础，确保在电源循环和错误条件下的系统完整性。
 
@@ -971,7 +970,6 @@ int tlv_migrate_tag(uint16_t tag, void *data, uint16_t old_len,
 3. **迁移事件**：版本升级触发迁移过程
 4. **恢复场景**：从验证的备份恢复系统
 
-有关系统状态和生命周期管理的详细信息，请参阅 [系统状态和生命周期](https://zread.ai/WuWenBo1994/Tlv_Fram_System/3-system-states-and-lifecycle)。有关初始化过程，请参阅 [初始化和格式化](https://zread.ai/WuWenBo1994/Tlv_Fram_System/9-initialization-and-formatting)。
 
 ## 最佳实践
 
@@ -1002,7 +1000,6 @@ uint32_t wasted = allocated - used;
 *fragmentation_percent = (wasted * 100) / g_tlv_ctx.header->data_region_size;
 ```
 
-[tlv_calculate_fragmentation()](https://zread.ai/WuWenBo1994/Tlv_Fram_System/src/tlv_core.c#L1274-L1300) 中的计算为判断何时需要碎片整理提供了明确的指标。系统在系统头 [tlv_system_header_t](https://zread.ai/WuWenBo1994/Tlv_Fram_System/inc/tlv_types.h#L62-L63) 中同时跟踪碎片数量和大小，以维护精确的碎片统计信息。
 
 ### 碎片来源
 
@@ -1016,15 +1013,15 @@ uint32_t wasted = allocated - used;
 
 ## 碎片整理过程
 
-[tlv_defragment()](https://zread.ai/WuWenBo1994/Tlv_Fram_System/src/tlv_core.c#L861-L1020) 中的核心碎片整理算法实现了一个全面的内存重组过程，该过程压缩有效数据并消除所有碎片。
+[tlv_defragment()]中的核心碎片整理算法实现了一个全面的内存重组过程，该过程压缩有效数据并消除所有碎片。
 
 ### 算法概述
 
-![](Readme.assets/image-20251206141120049.png)
+![](docs/image-20251206141120049.png)
 
 ### 索引表优化
 
-在移动任何数据块之前，系统通过 [sort_index_table_inplace()](https://zread.ai/WuWenBo1994/Tlv_Fram_System/src/tlv_core.c#L798-L852) 执行关键的索引表优化：
+在移动任何数据块之前，系统通过 [sort_index_table_inplace()]执行关键的索引表优化：
 
 1. **压缩**：所有有效条目被移至索引表开头，消除已删除条目造成的间隙
 2. **基于地址的排序**：有效条目按其物理内存地址排序，确保顺序处理
@@ -1162,7 +1159,7 @@ TLV FRAM 系统提供全面的配置选项，允许开发者根据特定应用�
 
 系统使用固定的内存布局，将 FRAM 地址空间划分为功能区域 [tlv_config.h#L73-L89]：
 
-![image-20251206141330059](Readme.assets/image-20251206141330059.png)
+![image-20251206141330059](docs.assets/image-20251206141330059.png)
 
 | 区域   | 起始地址 | 大小      | 用途             |
 | ------ | -------- | --------- | ---------------- |
