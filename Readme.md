@@ -24,9 +24,10 @@ TLV (Tag-Length-Value) FRAM 系统是一个健壮、轻量级的数据存储解�
 系统采用 Tag-Length-Value 格式，其中每个数据项通过 16 位标签唯一标识：
 
 ```c++
+/*
 数据块结构:
 ┌─────────────────────────────────────┐
-│ TLV 头部 (14 字节)                  │
+│ TLV 头部 (14 字节)		    │
 │ ├─ 标签 (2 字节)                   │
 │ ├─ 长度 (2 字节)                   │
 │ ├─ 版本 (1 字节)                   │
@@ -38,6 +39,7 @@ TLV (Tag-Length-Value) FRAM 系统是一个健壮、轻量级的数据存储解�
 ├─────────────────────────────────────┤
 │ CRC16 校验和 (2 字节)              │
 └─────────────────────────────────────┘
+*/
 ```
 
 ## 关键特性
@@ -139,7 +141,7 @@ FRAM 内存被划分为不同区域，每个区域在 TLV 系统架构中 servin
 系统头作为 TLV 架构的根，包含系统运行所需的基本元数据 [tlv_types.h#L35-L58]：
 
 ```c++
-typedef struct 
+typedef struct
 {
     uint32_t magic;             // 魔数 0x544C5646
     uint16_t version;           // 格式版本号
@@ -151,9 +153,9 @@ typedef struct
     uint32_t last_update_time;  // 最后更新时间戳
     uint32_t free_space;        // 可用空间
     uint32_t used_space;        // 已用空间
-	uint32_t fragment_count;	// 碎片的数量
-	uint32_t fragment_size;		// 碎片的大小
-    uint8_t reserved[210];       // 保留扩展
+    uint32_t fragment_count;    // 碎片的数量
+    uint32_t fragment_size;     // 碎片的大小
+    uint8_t reserved[210];      // 保留扩展
     uint16_t header_crc16;      // Header自身CRC16（改为2字节）
 } tlv_system_header_t;
 ```
@@ -188,6 +190,7 @@ typedef struct
 数据块遵循经典 TLV 格式，并添加额外元数据用于版本控制和完整性检查 [tlv_types.h#L85-L100]：
 
 ```c
+/*
 ┌─────────────────────────────────────┐
 │ 数据块头部（14 字节）                │
 ├─────────────────────────────────────┤
@@ -202,6 +205,7 @@ typedef struct
 ├─────────────────────────────────────┤
 │ CRC16（2 字节）                      │
 └─────────────────────────────────────┘
+*/
 ```
 
 此结构支持高效的数据验证、版本跟踪和写入操作监控。
@@ -440,7 +444,7 @@ TLV FRAM 系统中的批处理操作提供了同时读写多个数据项的高�
 ### 函数签名
 
 ```c++
-int tlv_read_batch(const uint16_t *tags, uint16_t count,                    
+int tlv_read_batch(const uint16_t *tags, uint16_t count,                  
 void **buffers, uint16_t *lengths);
 ```
 
@@ -468,7 +472,7 @@ void **buffers, uint16_t *lengths);
 ### 函数签名
 
 ```c++
-int tlv_write_batch(const uint16_t *tags, uint16_t count,                    
+int tlv_write_batch(const uint16_t *tags, uint16_t count,                  
 const void **datas, const uint16_t *lengths);
 ```
 
@@ -1040,13 +1044,13 @@ if (entry->data_addr != write_pos) {
   
     while (remaining > 0) {
         uint32_t chunk_size = (remaining > TLV_BUFFER_SIZE) ? TLV_BUFFER_SIZE : remaining;
-      
+    
         // 从当前位置读取
         ret = tlv_port_fram_read(entry->data_addr + src_offset, g_tlv_ctx.static_buffer, chunk_size);
-      
+    
         // 写入新的压缩位置
         ret = tlv_port_fram_write(write_pos + src_offset, g_tlv_ctx.static_buffer, chunk_size);
-      
+    
         src_offset += chunk_size;
         remaining -= chunk_size;
     }
@@ -1375,8 +1379,6 @@ typedef int (*tlv_migration_func_t)(
 );
 ```
 
-
-
 [`test/system_config_migration.c`](https://zread.ai/WuWenBo1994/Tlv_Fram_System/test/system_config_migration.c#L15-L200) 中的迁移实现展示了：
 
 - **原地迁移**以最小化内存开销
@@ -1465,7 +1467,7 @@ TLV FRAM 系统提供了一个全面的版本迁移框架，能够在保持向�
 
 迁移系统采用去中心化方法构建，每种数据类型通过元数据表中的函数指针定义自己的迁移逻辑。这种设计在保持统一接口的同时，允许灵活的特定类型转换。
 
-![image-20251206141652262](Readme.assets/image-20251206141652262.png)
+![image-20251206141652262](docs/image-20251206141652262.png)
 
 核心迁移函数签名 [tlv_migration_func_t](https://zread.ai/WuWenBo1994/Tlv_Fram_System/inc/tlv_types.h#L127-L138) 确保所有迁移操作遵循一致的模式：
 
@@ -1747,10 +1749,10 @@ void first_boot_example(void)
   
     if (result == TLV_INIT_FIRST_BOOT) {
         printf("First boot detected, formatting...\n");
-    
+  
         // 使用默认魔数（TLV_SYSTEM_MAGIC）
         int ret = tlv_format(0);
-    
+  
         if (ret == TLV_OK) {
             printf("Format successful!\n");
             // 现在可以写入数据
@@ -1771,11 +1773,11 @@ void corruption_recovery_example(void)
   
     if (result == TLV_INIT_ERROR) {
         printf("System corrupted!\n");
-    
+  
         // 尝试恢复
         if (tlv_restore_from_backup() != TLV_OK) {
             printf("Backup restore failed, formatting...\n");
-        
+      
             // 最后手段：格式化（会丢失所有数据）
             tlv_format(0);
         }
@@ -1797,13 +1799,13 @@ void factory_reset_example(void)
         uint8_t serial[32];
         uint16_t len = sizeof(serial);
         tlv_read(TAG_SYSTEM_SERIAL_NUMBER, serial, &len);
-    
+  
         // 格式化
         tlv_format(0);
-    
+  
         // 恢复重要数据
         tlv_write(TAG_SYSTEM_SERIAL_NUMBER, serial, len);
-    
+  
         printf("Factory reset complete\n");
     }
 }
@@ -1924,17 +1926,17 @@ int tlv_backup_all(void)
     while (offset < backup_size) {
         uint32_t chunk_size = (backup_size - offset > TLV_BUFFER_SIZE) ?
                               TLV_BUFFER_SIZE : (backup_size - offset);
-    
+  
         // 读取管理区（Header + Index）
         tlv_port_fram_read(TLV_HEADER_ADDR + offset, 
                           g_tlv_ctx.static_buffer, 
                           chunk_size);
-    
+  
         // 写入备份区
         tlv_port_fram_write(TLV_BACKUP_ADDR + offset, 
                            g_tlv_ctx.static_buffer, 
                            chunk_size);
-    
+  
         offset += chunk_size;
     }
   
@@ -1984,17 +1986,17 @@ int tlv_restore_from_backup(void)
     while (offset < backup_size) {
         uint32_t chunk_size = (backup_size - offset > TLV_BUFFER_SIZE) ?
                               TLV_BUFFER_SIZE : (backup_size - offset);
-    
+  
         // 从备份区读取
         tlv_port_fram_read(TLV_BACKUP_ADDR + offset, 
                           g_tlv_ctx.static_buffer, 
                           chunk_size);
-    
+  
         // 写入到管理区
         tlv_port_fram_write(TLV_HEADER_ADDR + offset, 
                            g_tlv_ctx.static_buffer, 
                            chunk_size);
-    
+  
         offset += chunk_size;
     }
   
@@ -2053,17 +2055,17 @@ void boot_sequence(void)
         case TLV_INIT_OK:
             // 正常
             break;
-        
+      
         case TLV_INIT_RECOVERED:
             // 已从备份恢复
             printf("WARNING: Restored from backup\n");
             break;
-        
+      
         case TLV_INIT_FIRST_BOOT:
             // 首次启动
             tlv_format(0);
             break;
-        
+      
         case TLV_INIT_ERROR:
             // 备份也失败了
             printf("FATAL: Cannot recover, need format\n");
@@ -2146,17 +2148,17 @@ void complete_lifecycle_example(void)
             tlv_format(0);
             // 状态：FORMATTED → INITIALIZED
             break;
-        
+      
         case TLV_INIT_OK:
             printf("System OK\n");
             // 状态：INITIALIZED
             break;
-        
+      
         case TLV_INIT_RECOVERED:
             printf("Recovered from backup\n");
             // 状态：INITIALIZED
             break;
-        
+      
         case TLV_INIT_ERROR:
             printf("FATAL ERROR\n");
             // 状态：ERROR
@@ -2213,15 +2215,15 @@ int safe_operation(void)
         case TLV_STATE_FORMATTED:
             // 可以操作
             return TLV_OK;
-        
+      
         case TLV_STATE_UNINITIALIZED:
             printf("ERROR: System not initialized, call tlv_format() first\n");
             return TLV_ERROR;
-        
+      
         case TLV_STATE_ERROR:
             printf("ERROR: System in error state, try restore or format\n");
             return TLV_ERROR;
-        
+      
         default:
             return TLV_ERROR;
     }

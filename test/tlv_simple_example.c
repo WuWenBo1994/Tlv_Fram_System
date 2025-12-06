@@ -3,8 +3,7 @@
  * @brief TLV系统简化版使用示例（纯裸机）
  */
  
-#include "tlv_fram.h"
-#include "tlv_meta_table.h"
+#include "tlv_file_system.h"
 #include <string.h>
  
 // 假设这些是你在port.c中实现的硬件接口
@@ -37,6 +36,11 @@ void example_usage(void)
     tlv_init_result_t init_result = tlv_init();
     if (init_result == TLV_INIT_FIRST_BOOT) {
         tlv_format(0);
+        init_result = tlv_init();
+        if (init_result != TLV_INIT_OK) {
+            // 初始化失败
+            return;
+        }
     }
  
     // 写入系统配置
