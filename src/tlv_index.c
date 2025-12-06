@@ -1,6 +1,6 @@
 /**
  * @file tlv_index.c
- * @brief TLV索引管理模块（简化版，数组查找）
+ * @brief TLV索引管理模块（简化版,数组查找）
  */
 
 #include "tlv_index.h"
@@ -19,8 +19,8 @@ static bool is_tag_region_valid(uint16_t tag, uint32_t addr, uint32_t size);
 /**
  * @brief 初始化TLV上下文的索引结构
  * 
- * 该函数用于初始化tlv_context_t结构体中的header和index_table成员，
- * 使用静态分配的内存空间，并将这些内存区域清零。
+ * 该函数用于初始化tlv_context_t结构体中的header和index_table成员,
+ * 使用静态分配的内存空间,并将这些内存区域清零。
  * 
  * @param ctx 指向TLV上下文结构体的指针
  * 
@@ -42,8 +42,8 @@ int tlv_index_init(tlv_context_t *ctx)
 
 /**
  * @brief 释放TLV索引相关的资源
- * 该函数用于清理tlv_context_t结构体中的索引相关指针，
- * 将header和index_table指针置为NULL。由于这些内存是静态分配的，因此不需要实际的内存释放操作。
+ * 该函数用于清理tlv_context_t结构体中的索引相关指针,
+ * 将header和index_table指针置为NULL。由于这些内存是静态分配的,因此不需要实际的内存释放操作。
  *
  * @param ctx 指向tlv_context_t结构体的指针
  */
@@ -54,7 +54,7 @@ void tlv_index_deinit(tlv_context_t *ctx)
         return;
     }
 
-    /* 静态分配的内存，只需要将指针置空，无需实际释放 */
+    /* 静态分配的内存,只需要将指针置空,无需实际释放 */
     ctx->header = NULL;
     ctx->index_table = NULL;
 }
@@ -62,9 +62,9 @@ void tlv_index_deinit(tlv_context_t *ctx)
 /**
  * @brief 从FRAM加载TLV索引表
  * 
- * 该函数负责从FRAM中读取索引表数据，并进行CRC16校验以确保数据完整性。
+ * 该函数负责从FRAM中读取索引表数据,并进行CRC16校验以确保数据完整性。
  * 
- * @param ctx 指向TLV上下文结构体的指针，必须包含有效的index_table成员
+ * @param ctx 指向TLV上下文结构体的指针,必须包含有效的index_table成员
  * 
  * @return TLV_OK - 成功加载并校验通过
  * @return TLV_ERROR_INVALID_PARAM - 参数无效（ctx或index_table为空）
@@ -98,10 +98,10 @@ int tlv_index_load(tlv_context_t *ctx)
 /**
  * @brief 保存TLV索引表到FRAM存储器
  * 
- * 该函数负责将TLV索引表计算CRC校验码后写入FRAM存储器中，
+ * 该函数负责将TLV索引表计算CRC校验码后写入FRAM存储器中,
  * 用于持久化保存索引信息。
  * 
- * @param ctx TLV上下文指针，包含索引表等信息
+ * @param ctx TLV上下文指针,包含索引表等信息
  * 
  * @return TLV_ERROR_INVALID_PARAM 参数无效
  * @return 其他 返回tlv_port_fram_write函数的执行结果
@@ -123,14 +123,14 @@ int tlv_index_save(tlv_context_t *ctx)
 /**
  * @brief 验证TLV索引表的完整性
  * 
- * 该函数通过计算索引表的CRC校验值并与存储的CRC值进行比较，
+ * 该函数通过计算索引表的CRC校验值并与存储的CRC值进行比较,
  * 来验证索引表是否完整且未被篡改。
  * 
- * @param ctx TLV上下文指针，包含索引表信息
+ * @param ctx TLV上下文指针,包含索引表信息
  * 
  * @return TLV_OK CRC校验成功
- * @return TLV_ERROR_INVALID_PARAM 参数无效，ctx或索引表为空
- * @return TLV_ERROR_CRC_FAILED CRC校验失败，数据可能已损坏
+ * @return TLV_ERROR_INVALID_PARAM 参数无效,ctx或索引表为空
+ * @return TLV_ERROR_CRC_FAILED CRC校验失败,数据可能已损坏
  */
 int tlv_index_verify(tlv_context_t *ctx)
 {
@@ -155,14 +155,14 @@ int tlv_index_verify(tlv_context_t *ctx)
 /**
  * @brief 在TLV索引表中查找指定标签的条目
  * 
- * @param ctx TLV上下文指针，包含索引表信息
+ * @param ctx TLV上下文指针,包含索引表信息
  * @param tag 要查找的标签值
  * 
- * @return 成功时返回指向找到的索引条目的指针，未找到或出错时返回NULL
+ * @return 成功时返回指向找到的索引条目的指针,未找到或出错时返回NULL
  */
 tlv_index_entry_t *tlv_index_find(tlv_context_t *ctx, uint16_t tag)
 {
-    // 参数有效性检查：上下文、索引表是否存在，标签是否有效
+    // 参数有效性检查：上下文、索引表是否存在,标签是否有效
     if (!ctx || !ctx->index_table || tag == 0)
     {
         return NULL;
@@ -187,10 +187,10 @@ tlv_index_entry_t *tlv_index_find(tlv_context_t *ctx, uint16_t tag)
  * @brief 根据标签值查找在元数据映射表中的索引位置
  * 
  * @param tag 要查找的标签值
- * @return 如果找到匹配的标签，返回其在TLV_META_MAP数组中的索引；如果未找到，返回-1
+ * @return 如果找到匹配的标签,返回其在TLV_META_MAP数组中的索引；如果未找到,返回-1
  * 
  * 该函数通过遍历TLV_META_MAP数组来查找指定标签的位置。
- * 当遇到标签值为0xFFFF的特殊标记时，表示已到达数组有效数据的末尾，停止查找。
+ * 当遇到标签值为0xFFFF的特殊标记时,表示已到达数组有效数据的末尾,停止查找。
  */
 static inline int get_tag_index(tlv_context_t *ctx, uint16_t tag)
 {
@@ -201,33 +201,33 @@ static inline int get_tag_index(tlv_context_t *ctx, uint16_t tag)
     }
 	
     // 遍历元数据映射表查找匹配的标签
-    // 如果元数据表有序，可以使用二分查找来优化性能
+    // 如果元数据表有序,可以使用二分查找来优化性能
     for (int i = 0; i < ctx->meta_table_size; i++)
     {
-        // 找到匹配的标签，返回索引位置
+        // 找到匹配的标签,返回索引位置
         if (ctx->meta_table[i].tag == tag)
         {
             return i;
         }
-        // 遇到结束标记，停止查找
+        // 遇到结束标记,停止查找
         if (ctx->meta_table[i].tag == 0xFFFF)
         {
             break;
         }
     }
-    // 未找到匹配的标签，返回错误码-1
+    // 未找到匹配的标签,返回错误码-1
     return -1;
 }
 
 /**
  * @brief 快速查找TLV标签对应的索引条目
  * 
- * 该函数首先尝试使用预计算的索引表进行O(1)时间复杂度的查找，
- * 如果预计算索引不可用或无效，则回退到线性搜索方式。
+ * 该函数首先尝试使用预计算的索引表进行O(1)时间复杂度的查找,
+ * 如果预计算索引不可用或无效,则回退到线性搜索方式。
  * 
- * @param ctx TLV上下文指针，包含索引表信息
+ * @param ctx TLV上下文指针,包含索引表信息
  * @param tag 要查找的标签值
- * @return 找到的索引条目指针，如果未找到则返回NULL
+ * @return 找到的索引条目指针,如果未找到则返回NULL
  */
 tlv_index_entry_t *tlv_index_find_fast(tlv_context_t *ctx, uint16_t tag)
 {
@@ -248,7 +248,7 @@ tlv_index_entry_t *tlv_index_find_fast(tlv_context_t *ctx, uint16_t tag)
         }
     }
 
-    // 预计算索引查找失败，回退到线性搜索
+    // 预计算索引查找失败,回退到线性搜索
     return tlv_index_find(ctx, tag);
 }
 
@@ -268,13 +268,13 @@ tlv_index_entry_t *tlv_index_find_free_slot(tlv_context_t *ctx)
         }
     }
 	
-	// 如果没有空槽位，可以选择复用脏槽位
+	// 如果没有空槽位,可以选择复用脏槽位
 	for (int i = 0; i < TLV_MAX_TAG_COUNT; i++) 
 	{
 		if ((ctx->index_table->entries[i].flags & TLV_FLAG_DIRTY) && 
 			!(ctx->index_table->entries[i].flags & TLV_FLAG_VALID)) 
 		{
-			// 清空脏块槽位，复用
+			// 清空脏块槽位,复用
 			memset(&ctx->index_table->entries[i], 0, sizeof(tlv_index_entry_t));
 			if(ctx->header->fragment_count > 0)
 			{
@@ -293,10 +293,10 @@ tlv_index_entry_t *tlv_index_find_free_slot(tlv_context_t *ctx)
 /**
  * @brief 向TLV索引中添加一个新的条目或更新已存在的条目
  * 
- * @param ctx TLV上下文指针，包含索引信息
- * @param tag 要添加的标签值，不能为0
- * @param addr 数据地址，必须是有效地址
- * @return 成功时返回指向索引条目的指针，失败时返回NULL
+ * @param ctx TLV上下文指针,包含索引信息
+ * @param tag 要添加的标签值,不能为0
+ * @param addr 数据地址,必须是有效地址
+ * @return 成功时返回指向索引条目的指针,失败时返回NULL
  */
 tlv_index_entry_t *tlv_index_add(tlv_context_t *ctx, uint16_t tag, uint32_t addr)
 {
@@ -305,7 +305,7 @@ tlv_index_entry_t *tlv_index_add(tlv_context_t *ctx, uint16_t tag, uint32_t addr
         return NULL;
     }
 
-    // 检查是否已存在相同tag的条目，如果存在则更新地址和有效标志
+    // 检查是否已存在相同tag的条目,如果存在则更新地址和有效标志
     tlv_index_entry_t *existing = tlv_index_find(ctx, tag);
     if (existing)
     {
@@ -321,7 +321,7 @@ tlv_index_entry_t *tlv_index_add(tlv_context_t *ctx, uint16_t tag, uint32_t addr
         return NULL;
     }
 
-    // 填充索引条目信息，包括标签、数据地址、有效标志和版本号
+    // 填充索引条目信息,包括标签、数据地址、有效标志和版本号
     const tlv_meta_const_t * meta = find_meta_by_tag(ctx, tag);
     entry->tag = tag;
     entry->data_addr = addr;
@@ -345,7 +345,7 @@ tlv_index_entry_t *tlv_index_add(tlv_context_t *ctx, uint16_t tag, uint32_t addr
 /**
  * @brief 更新TLV索引表中指定标签的地址信息
  * 
- * @param ctx TLV上下文指针，包含索引表信息
+ * @param ctx TLV上下文指针,包含索引表信息
  * @param tag 要更新的TLV标签值
  * @param addr 新的数据地址值
  * 
@@ -382,7 +382,7 @@ int tlv_index_update(tlv_context_t *ctx, uint16_t tag, uint32_t addr)
  * @brief 从TLV上下文中移除指定标签的索引项
  * @param ctx TLV上下文指针
  * @param tag 要移除的标签值
- * @return TLV_OK表示成功移除，TLV_ERROR_INVALID_PARAM表示参数无效，TLV_ERROR_NOT_FOUND表示未找到对应标签
+ * @return TLV_OK表示成功移除,TLV_ERROR_INVALID_PARAM表示参数无效,TLV_ERROR_NOT_FOUND表示未找到对应标签
  */
 int tlv_index_remove(tlv_context_t *ctx, uint16_t tag)
 {
@@ -418,7 +418,7 @@ int tlv_index_remove(tlv_context_t *ctx, uint16_t tag)
  * @brief 根据标签值查找对应的元数据信息
  * 
  * @param tag 要查找的标签值
- * @return 返回指向匹配的元数据结构体的指针，如果未找到则返回NULL
+ * @return 返回指向匹配的元数据结构体的指针,如果未找到则返回NULL
  */
 static const tlv_meta_const_t *find_meta_by_tag(tlv_context_t *ctx, uint16_t tag)
 {
@@ -431,18 +431,18 @@ static const tlv_meta_const_t *find_meta_by_tag(tlv_context_t *ctx, uint16_t tag
     // 遍历元数据映射表查找匹配的标签
     for (uint32_t i = 0; i < ctx->meta_table_size; i++)
     {
-        // 找到匹配的标签，返回对应的元数据指针
+        // 找到匹配的标签,返回对应的元数据指针
         if (ctx->meta_table[i].tag == tag)
         {
             return &ctx->meta_table[i];
         }
-        // 遇到结束标记(0xFFFF)，停止搜索
+        // 遇到结束标记(0xFFFF),停止搜索
         if (ctx->meta_table[i].tag == 0xFFFF)
         {
             break;
         }
     }
-    // 未找到匹配的标签，返回空指针
+    // 未找到匹配的标签,返回空指针
     return NULL;
 }
 

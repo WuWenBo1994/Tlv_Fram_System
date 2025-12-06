@@ -10,8 +10,8 @@
 #include <stdbool.h>
  
 /* ============================ 版本信息 ============================ */
-#define TLV_FILE_SYSTEM_VERSION_MAJOR   0
-#define TLV_FILE_SYSTEM_VERSION_MINOR   1
+#define TLV_FILE_SYSTEM_VERSION_MAJOR   1
+#define TLV_FILE_SYSTEM_VERSION_MINOR   0
 #define TLV_FILE_SYSTEM_VERSION_PATCH   0
 
 /* ============================ 基础配置 ============================ */
@@ -40,6 +40,9 @@
 /** 使用碎片自动整理功能 */
 #define TLV_AUTO_CLEAN_FRAGEMENT     1
 
+/** 触发碎片整理的百分比 */
+#define TLV_AUTO_DEFRAG_THRESHOLD    20
+
 /** 调试模式     */
 #define TLV_DEBUG                    0
 #define tlv_printf(...)     
@@ -48,14 +51,6 @@
 /** 读写缓冲区大小（静态分配） */
 #define TLV_BUFFER_SIZE              512
  
-/* ============================ 内存碎片自动整理配置 ================= */ 
- 
-/** 触发碎片整理的数量 */
-#define TLV_AUTO_CLEAN_FRAGEMENT_NUMBER			 10
- 
-/** 触发碎片整理的内存大小 */
-#define TLV_AUTO_CLEAN_FRAGEMENT_SIZE			 (20*1024)		// 20kb
-
 /* ============================ 地址配置 ============================ */
  
 /** 系统Header起始地址 */

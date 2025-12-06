@@ -6,7 +6,7 @@
  * @date 2025-12-05
  * 
  * @copyright Copyright (c) 2025
- * @note 需要维护一个TLV元数据表，元数据表是一个常量表，存储元数据信息，元数据信息包括Tag、MaxLen、Prior、Ver、Bkup、Name等信息。
+ * @note 需要维护一个TLV元数据表,元数据表是一个常量表,存储元数据信息,元数据信息包括Tag、MaxLen、Prior、Ver、Bkup、Name等信息。
  *       该文件实现了元数据表的定义和获取函数。可在其他文件中定义新的元数据表以覆盖默认实现。
  */
  

@@ -14,13 +14,19 @@
 
 #define STATIC_CHECK_SIZE(type, expected) \
     char check_##type[(sizeof(type) == expected) ? 1 : -1]
+
+#define STATIC_GATHER_CHECK(now, expected) \
+    char check_gather_##now[(now >= expected) ? 1 : -1]
+
+#define STATIC_LESS_CHECK(now, expected) \
+    char check_less_##now[(now <= expected) ? 1 : -1]
 /* ============================ 基础类型 ============================ */
 
 /** TLV状态枚举 */
 typedef enum
 {
     TLV_STATE_UNINITIALIZED = 0, // 系统尚未初始化
-    TLV_STATE_INITIALIZED,       // 系统准备就绪，可正常运行
+    TLV_STATE_INITIALIZED,       // 系统准备就绪,可正常运行
     TLV_STATE_ERROR,             // 系统处于错误状态
     TLV_STATE_FORMATTED          // 系统已格式化但未初始化
 } tlv_state_t;
@@ -65,7 +71,7 @@ typedef struct
     uint16_t header_crc16;      // Header自身CRC16（改为2字节）
 } tlv_system_header_t;
 
-/** Tag索引表项结构（8字节，简化） */
+/** Tag索引表项结构（8字节,简化） */
 typedef struct
 {
     uint16_t tag;       // Tag值（0x0000为无效）
@@ -74,14 +80,14 @@ typedef struct
     uint32_t data_addr; // 数据块在FRAM中的绝对地址
 } tlv_index_entry_t;
 
-/** Tag索引表结构（简化，2050字节） */
+/** Tag索引表结构（简化,2050字节） */
 typedef struct
 {
     tlv_index_entry_t entries[TLV_MAX_TAG_COUNT];
     uint16_t index_crc16; // 索引表CRC16
 } tlv_index_table_t;
 /* ============================ 数据块结构 ============================ */
-/** TLV数据块Header结构（14字节，CRC16版本） */
+/** TLV数据块Header结构（14字节,CRC16版本） */
 typedef struct
 {
     uint16_t tag;         // Tag值
@@ -94,7 +100,7 @@ typedef struct
 // 数据块大小计算
 #define TLV_BLOCK_SIZE(dataLen) (sizeof(tlv_data_block_header_t) + dataLen + sizeof(uint16_t))
 
-/** 完整的TLV数据块,永远不会实例化这个数组，仅表示数据结构 */
+/** 完整的TLV数据块,永远不会实例化这个数组,仅表示数据结构 */
 typedef struct
 {
     tlv_data_block_header_t header; // 数据块Header (14字节)
@@ -117,7 +123,7 @@ typedef struct
  * @return 0: 成功, 其他: 错误码
  *
  * @note 迁移函数必须能够在同一缓冲区中完成转换
- *       如果需要临时空间，使用栈上的小变量（<256B）
+ *       如果需要临时空间,使用栈上的小变量（<256B）
  */
 typedef int (*tlv_migration_func_t)(
     void *data,        // 输入/输出缓冲区

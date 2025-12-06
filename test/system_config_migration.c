@@ -10,15 +10,15 @@
 /**
  * @brief V1->V2的迁移函数（原地）
  *
- * @param data      指向配置数据的指针，用于原地迁移
+ * @param data      指向配置数据的指针,用于原地迁移
  * @param old_len   旧配置数据的长度
- * @param new_len   输出参数，指向存储新配置数据长度的变量
+ * @param new_len   输出参数,指向存储新配置数据长度的变量
  * @param max_size  数据缓冲区的最大大小
- * @param old_ver   旧配置版本号，应为1
- * @param new_ver   新配置版本号，应为2
+ * @param old_ver   旧配置版本号,应为1
+ * @param new_ver   新配置版本号,应为2
  *
  * @return TLV_OK 成功迁移
- *         TLV_ERROR_INVALID_PARAM 参数无效，旧数据长度不足
+ *         TLV_ERROR_INVALID_PARAM 参数无效,旧数据长度不足
  *         TLV_ERROR_NO_MEMORY 缓冲区空间不足
  *         TLV_ERROR_VERSION 版本号不匹配
  */
@@ -59,7 +59,7 @@ int migrate_system_config_v1_to_v2(void *data,
     // 2. 转换为新结构（同一缓冲区）
     system_config_v2_t *v2 = (system_config_v2_t *)data;
 
-    // 3. 填充新结构（从后往前，避免覆盖）
+    // 3. 填充新结构（从后往前,避免覆盖）
     v2->reserved = 0;
     strcpy(v2->product, "DefaultProduct");
     v2->flags = 0x00000001;
@@ -77,15 +77,15 @@ int migrate_system_config_v1_to_v2(void *data,
 /**
  * @brief V2->V3的迁移函数（原地）
  *
- * @param data      指向配置数据的指针，用于原地迁移
+ * @param data      指向配置数据的指针,用于原地迁移
  * @param old_len   旧配置数据的长度
- * @param new_len   输出参数，指向存储新配置数据长度的变量
+ * @param new_len   输出参数,指向存储新配置数据长度的变量
  * @param max_size  数据缓冲区的最大大小
- * @param old_ver   旧配置版本号，应为1
- * @param new_ver   新配置版本号，应为2
+ * @param old_ver   旧配置版本号,应为1
+ * @param new_ver   新配置版本号,应为2
  *
  * @return TLV_OK 成功迁移
- *         TLV_ERROR_INVALID_PARAM 参数无效，旧数据长度不足
+ *         TLV_ERROR_INVALID_PARAM 参数无效,旧数据长度不足
  *         TLV_ERROR_NO_MEMORY 缓冲区空间不足
  *         TLV_ERROR_VERSION 版本号不匹配
  */
@@ -137,8 +137,8 @@ int migrate_system_config_v2_to_v3(void *data,
 #define CONFIG_DEFAULT_HW_VERSION 0
     v3->hw_version = CONFIG_DEFAULT_HW_VERSION;
 
-// 新增字段：序列号（从其他地方获取，或使用默认值）
-// 这里可以从硬件读取，或者使用默认值
+// 新增字段：序列号（从其他地方获取,或使用默认值）
+// 这里可以从硬件读取,或者使用默认值
 #define CONFIG_DEFAULT_SERIAL 0
     v3->serial_number = CONFIG_DEFAULT_SERIAL;
 

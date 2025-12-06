@@ -95,7 +95,7 @@ uint16_t tlv_crc16_update(uint16_t crc, const void *data, uint32_t size)
  */
 uint16_t tlv_crc16_final(uint16_t crc)
 {
-    // 对于ModBus CRC，通常不需要额外处理，直接返回即可
+    // 对于ModBus CRC,通常不需要额外处理,直接返回即可
     return crc >> 8 | (crc << 8);
 }
 
@@ -195,7 +195,7 @@ int tlv_version_compare(uint16_t v1, uint16_t v2)
  */
 bool tlv_version_compatible(uint16_t current, uint16_t required)
 {
-    // 主版本必须相同，次版本可以向后兼容
+    // 主版本必须相同,次版本可以向后兼容
     return (current >> 8) == (required >> 8) && current >= required;
 }
 

@@ -444,7 +444,7 @@ TLV FRAM 系统中的批处理操作提供了同时读写多个数据项的高�
 ### 函数签名
 
 ```c++
-int tlv_read_batch(const uint16_t *tags, uint16_t count,                  
+int tlv_read_batch(const uint16_t *tags, uint16_t count,              
 void **buffers, uint16_t *lengths);
 ```
 
@@ -472,7 +472,7 @@ void **buffers, uint16_t *lengths);
 ### 函数签名
 
 ```c++
-int tlv_write_batch(const uint16_t *tags, uint16_t count,                  
+int tlv_write_batch(const uint16_t *tags, uint16_t count,              
 const void **datas, const uint16_t *lengths);
 ```
 
@@ -1044,13 +1044,13 @@ if (entry->data_addr != write_pos) {
   
     while (remaining > 0) {
         uint32_t chunk_size = (remaining > TLV_BUFFER_SIZE) ? TLV_BUFFER_SIZE : remaining;
-    
+  
         // 从当前位置读取
         ret = tlv_port_fram_read(entry->data_addr + src_offset, g_tlv_ctx.static_buffer, chunk_size);
-    
+  
         // 写入新的压缩位置
         ret = tlv_port_fram_write(write_pos + src_offset, g_tlv_ctx.static_buffer, chunk_size);
-    
+  
         src_offset += chunk_size;
         remaining -= chunk_size;
     }
@@ -1777,7 +1777,7 @@ void corruption_recovery_example(void)
         // 尝试恢复
         if (tlv_restore_from_backup() != TLV_OK) {
             printf("Backup restore failed, formatting...\n");
-      
+  
             // 最后手段：格式化（会丢失所有数据）
             tlv_format(0);
         }
@@ -2055,17 +2055,17 @@ void boot_sequence(void)
         case TLV_INIT_OK:
             // 正常
             break;
-      
+  
         case TLV_INIT_RECOVERED:
             // 已从备份恢复
             printf("WARNING: Restored from backup\n");
             break;
-      
+  
         case TLV_INIT_FIRST_BOOT:
             // 首次启动
             tlv_format(0);
             break;
-      
+  
         case TLV_INIT_ERROR:
             // 备份也失败了
             printf("FATAL: Cannot recover, need format\n");
@@ -2148,17 +2148,17 @@ void complete_lifecycle_example(void)
             tlv_format(0);
             // 状态：FORMATTED → INITIALIZED
             break;
-      
+  
         case TLV_INIT_OK:
             printf("System OK\n");
             // 状态：INITIALIZED
             break;
-      
+  
         case TLV_INIT_RECOVERED:
             printf("Recovered from backup\n");
             // 状态：INITIALIZED
             break;
-      
+  
         case TLV_INIT_ERROR:
             printf("FATAL ERROR\n");
             // 状态：ERROR
@@ -2215,15 +2215,15 @@ int safe_operation(void)
         case TLV_STATE_FORMATTED:
             // 可以操作
             return TLV_OK;
-      
+  
         case TLV_STATE_UNINITIALIZED:
             printf("ERROR: System not initialized, call tlv_format() first\n");
             return TLV_ERROR;
-      
+  
         case TLV_STATE_ERROR:
             printf("ERROR: System in error state, try restore or format\n");
             return TLV_ERROR;
-      
+  
         default:
             return TLV_ERROR;
     }
@@ -2249,15 +2249,3 @@ int safe_operation(void)
 - **tlv_backup_all()**：备份Header+Index到备份区
 - **tlv_restore_from_backup()**：从备份区恢复
 - **建议**：关键操作前备份，定期自动备份
-
-# 核心API函数
-
-## 初始化  **tlv_init()**
-
-## 格式化  **tlv_format()**
-
-## 碎片整理  **tlv_defragment()**
-
-## 数据写入 **tlv_write()**
-
-## 数据读取 **tlv_read()**

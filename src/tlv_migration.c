@@ -52,7 +52,7 @@ static const tlv_meta_const_t *get_meta(uint16_t tag)
  * @return 0: 成功, 其他: 错误码
  *
  * @note 迁移函数必须能够在同一缓冲区中完成转换
- *       如果需要临时空间，使用栈上的小变量（<256B）
+ *       如果需要临时空间,使用栈上的小变量（<256B）
  */
 int tlv_migrate_tag(uint16_t tag,
                     void *data,
@@ -76,14 +76,14 @@ int tlv_migrate_tag(uint16_t tag,
     // ========== 版本检查 ==========
     if (current_ver == meta->version)
     {
-        // 版本相同，无需迁移
+        // 版本相同,无需迁移
         *new_len = old_len;
         return TLV_OK;
     }
 
     if (current_ver > meta->version)
     {
-		// 版本回退，不支持
+		// 版本回退,不支持
         #if TLV_DEBUG
         tlv_printf("ERROR: Version downgrade not supported\n");
         tlv_printf("  Tag: 0x%04X, Current: %u, Target: %u\n",
@@ -95,7 +95,7 @@ int tlv_migrate_tag(uint16_t tag,
     // ========== 检查是否有迁移函数 ==========
     if (!meta->migrate)
     {
-        // 没有迁移函数，无法升级
+        // 没有迁移函数,无法升级
         #if TLV_DEBUG
         tlv_printf("ERROR: No migration function for tag 0x%04X\n", tag);
         tlv_printf("  Current version: %u, Expected: %u\n",
@@ -171,18 +171,18 @@ int tlv_migrate_all(void)
         const tlv_meta_const_t *meta = get_meta(entry->tag);
         if (!meta)
         {
-            continue; // Tag不在元数据表中，跳过
+            continue; // Tag不在元数据表中,跳过
         }
 
         // 检查版本
         if (entry->version == meta->version)
         {
-            continue; // 版本相同，无需迁移
+            continue; // 版本相同,无需迁移
         }
 
         if (entry->version > meta->version)
         {
-            // 版本降级，警告但跳过
+            // 版本降级,警告但跳过
             #if TLV_DEBUG
             tlv_printf("WARNING: Tag 0x%04X version downgrade detected (v%u -> v%u)\n",
                    entry->tag, entry->version, meta->version);
@@ -193,7 +193,7 @@ int tlv_migrate_all(void)
 
         if (!meta->migrate)
         {
-            // 无迁移函数，警告但跳过
+            // 无迁移函数,警告但跳过
             #if TLV_DEBUG
             tlv_printf("WARNING: Tag 0x%04X needs migration but no function provided\n",
                    entry->tag);
@@ -204,7 +204,7 @@ int tlv_migrate_all(void)
 
         // ========== 需要迁移 ==========
 
-        // 分配缓冲区（使用栈或静态，根据大小）
+        // 分配缓冲区（使用栈或静态,根据大小）
         uint8_t stack_buffer[256]; // 小缓冲区在栈上
         uint8_t *buffer = NULL;
         uint16_t buffer_size = 0;
@@ -223,7 +223,7 @@ int tlv_migrate_all(void)
         }
         else
         {
-            // 数据太大，跳过
+            // 数据太大,跳过
             #if TLV_DEBUG
             tlv_printf("ERROR: Tag 0x%04X too large for migration (%u bytes)\n",
                    entry->tag, meta->max_length);

@@ -74,7 +74,6 @@ uint32_t tlv_htobe32(uint32_t value);
 uint32_t tlv_betoh32(uint32_t value);
  
 /* ============================ 对齐操作 ============================ */
- 
 /**
  * @brief 向上对齐到指定边界
  * @param size 原始大小

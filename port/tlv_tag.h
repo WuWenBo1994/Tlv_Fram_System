@@ -6,7 +6,7 @@
  * @date 2025-12-05
  * 
  * @copyright Copyright (c) 2025
- * @note 定义TLV系统中使用的Tag标签，每个标签对应不同的数据项。
+ * @note 定义TLV系统中使用的Tag标签,每个标签对应不同的数据项。
  */
 
 #ifndef __TLV_TAG_H__

@@ -54,7 +54,7 @@ int tlv_index_verify(tlv_context_t *ctx);
  * @brief 查找Tag索引（线性搜索）
  * @param ctx 全局上下文
  * @param tag Tag值
- * @return 索引指针，NULL表示未找到
+ * @return 索引指针,NULL表示未找到
  */
 tlv_index_entry_t* tlv_index_find(tlv_context_t *ctx, uint16_t tag);
  
@@ -62,14 +62,14 @@ tlv_index_entry_t* tlv_index_find(tlv_context_t *ctx, uint16_t tag);
  * @brief 快速查找（优化版）
  * @param ctx 全局上下文
  * @param tag Tag值
- * @return 索引指针，NULL表示未找到
+ * @return 索引指针,NULL表示未找到
  */
 tlv_index_entry_t* tlv_index_find_fast(tlv_context_t *ctx, uint16_t tag);
  
 /**
  * @brief 查找空闲索引槽位
  * @param ctx 全局上下文
- * @return 索引指针，NULL表示已满
+ * @return 索引指针,NULL表示已满
  */
 tlv_index_entry_t* tlv_index_find_free_slot(tlv_context_t *ctx);
  
@@ -80,7 +80,7 @@ tlv_index_entry_t* tlv_index_find_free_slot(tlv_context_t *ctx);
  * @param ctx 全局上下文
  * @param tag Tag值
  * @param addr 数据地址
- * @return 索引指针，NULL表示失败
+ * @return 索引指针,NULL表示失败
  */
 tlv_index_entry_t* tlv_index_add(tlv_context_t *ctx, uint16_t tag, uint32_t addr);
  

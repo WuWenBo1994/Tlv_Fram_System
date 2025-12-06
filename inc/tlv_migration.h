@@ -18,7 +18,7 @@ extern "C" {
 /**
  * @brief 迁移单个Tag（内部函数）
  * @param tag Tag标识
- * @param data 数据缓冲区（输入旧数据，输出新数据）
+ * @param data 数据缓冲区（输入旧数据,输出新数据）
  * @param old_len 旧数据长度
  * @param new_len 新数据长度（输出）
  * @param max_size 缓冲区最大容量
@@ -34,7 +34,7 @@ int tlv_migrate_tag(uint16_t tag,
 
  /**
  * @brief 批量迁移所有Tag（可选）
- * @return 迁移的Tag数量，< 0: 错误
+ * @return 迁移的Tag数量< 0: 错误
  */
 int tlv_migrate_all(void);
  

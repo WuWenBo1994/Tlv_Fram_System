@@ -131,7 +131,7 @@ void test_system_config_migration(void)
     }
     printf("\n");
  
-    // ========== 测试3：已是V3，不应迁移 ==========
+    // ========== 测试3：已是V3,不应迁移 ==========
     printf("Test 3: V3 → V3 (No Migration)\n");
     printf("─────────────────────────────────────\n");
  

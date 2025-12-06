@@ -23,7 +23,7 @@ int tlv_port_fram_init(void);
  
 /**
  * @brief 读取FRAM数据
- * @param addr FRAM地址（相对地址，从0开始）
+ * @param addr FRAM地址（相对地址,从0开始）
  * @param data 数据缓冲区
  * @param size 读取大小
  * @return 0: 成功, 其他: 错误码
@@ -32,7 +32,7 @@ int tlv_port_fram_read(uint32_t addr, void *data, uint32_t size);
  
 /**
  * @brief 写入FRAM数据
- * @param addr FRAM地址（相对地址，从0开始）
+ * @param addr FRAM地址（相对地址,从0开始）
  * @param data 数据缓冲区
  * @param size 写入大小
  * @return 0: 成功, 其他: 错误码

@@ -29,7 +29,7 @@ int tlv_deinit(void);
  
 /**
  * @brief 格式化FRAM存储区
- * @param magic 魔数（可选，0使用默认）
+ * @param magic 魔数（可选,0使用默认）
  * @return 0: 成功, 其他: 错误码
  */
 int tlv_format(uint32_t magic);
@@ -47,7 +47,7 @@ tlv_state_t tlv_get_state(void);
  * @param tag Tag值
  * @param data 数据指针
  * @param len 数据长度
- * @return 实际写入长度，负数表示错误
+ * @return 实际写入长度,负数表示错误
  */
 int tlv_write(uint16_t tag, const void *data, uint16_t len);
  
@@ -55,7 +55,7 @@ int tlv_write(uint16_t tag, const void *data, uint16_t len);
  * @brief 读取TLV数据
  * @param tag Tag值
  * @param buf 输出缓冲区
- * @param len 缓冲区大小（输入），实际读取大小（输出）
+ * @param len 缓冲区大小（输入）,实际读取大小（输出）
  * @return 0: 成功, 其他: 错误码
  */
 int tlv_read(uint16_t tag, void *buf, uint16_t *len);

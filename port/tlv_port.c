@@ -15,7 +15,7 @@
  
 int tlv_port_fram_init(void)
 {
-    // 如果你的SPI已经初始化过，这里可以为空
+    // 如果你的SPI已经初始化过,这里可以为空
     // 或者调用你的初始化函数
 //    FRAM_Init();
     
