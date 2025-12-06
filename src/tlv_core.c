@@ -35,7 +35,9 @@ static int write_data_block(uint16_t tag, const void *data, uint16_t len, uint32
 static int read_data_block(uint32_t addr, void *buf, uint16_t *len);
 static const tlv_meta_const_t *get_meta(uint16_t tag);
 static int tlv_backup_all_internal(void);
-
+static void transaction_snapshot_create(void);
+static void transaction_snapshot_rollback(void);
+static void transaction_snapshot_commit(void);
 
 /* ============================ 系统管理API实现 ============================ */
 
@@ -59,10 +61,15 @@ tlv_init_result_t tlv_init(void)
     g_tlv_ctx.meta_table = tlv_get_meta_table();
     g_tlv_ctx.meta_table_size = tlv_get_meta_table_size();
 
+    // 初始化快照
+    g_tlv_ctx.snapshot.is_active = false;
 	// 清零数据
-	memset(&g_static_header, 0, sizeof(g_static_header));
+    memset(&g_static_header, 0, sizeof(g_static_header));
     memset(&g_static_index, 0, sizeof(g_static_index));
-	
+
+    
+    
+
     // 尝试加载系统Header
     ret = system_header_load();
     if (ret == TLV_OK)
@@ -246,11 +253,13 @@ int tlv_write(uint16_t tag, const void *data, uint16_t len)
         return TLV_ERROR_INVALID_PARAM;
     }
 
+    // 创建事务快照
+    transaction_snapshot_create();
     // 查找现有索引
     tlv_index_entry_t *index = tlv_index_find(&g_tlv_ctx, tag);
     uint32_t target_addr;
     uint32_t old_block_size = 0;
-    uint32_t new_block_size = sizeof(tlv_data_block_header_t) + len + sizeof(uint16_t);
+    uint32_t new_block_size = TLV_BLOCK_SIZE(len);
     bool is_update = false;                                               // 是否是更新操作
     bool need_add_index = false;                                          // 是否需要新增索引
     bool has_free_slot = g_tlv_ctx.header->tag_count < TLV_MAX_TAG_COUNT; // 判断索引表是否有空闲的槽位
@@ -265,8 +274,7 @@ int tlv_write(uint16_t tag, const void *data, uint16_t len)
             return ret;
         }
 
-        old_block_size = sizeof(tlv_data_block_header_t) + old_header.length + sizeof(uint16_t);
-
+        old_block_size = TLV_BLOCK_SIZE(old_header.length);
         if (new_block_size <= old_block_size)
         {
             // 数据需要更新
@@ -325,27 +333,12 @@ int tlv_write(uint16_t tag, const void *data, uint16_t len)
         #if TLV_DEBUG
         tlv_printf("write_data_block failed: %d\n", ret);
         #endif
-        // 写入失败，回滚 used_space,分配资源的next_free就不回收了，分配的内存作为碎片,等待碎片整理
-        g_tlv_ctx.header->fragment_count++;
-        g_tlv_ctx.header->fragment_size += new_block_size;
 
-        if (is_update)
-        {
-            // 恢复旧值
-            if (new_block_size <= old_block_size)
-            {
-                g_tlv_ctx.header->used_space -= new_block_size;
-                g_tlv_ctx.header->used_space += old_block_size;
-            }
-            else
-            {
-                g_tlv_ctx.header->used_space -= new_block_size;
-            }
-        }
-        else
-        {
-            g_tlv_ctx.header->used_space -= new_block_size;
-        }
+        // 写入失败，回滚所有状态，包括nextfree,避免未写入成功的内存成为碎片
+        transaction_snapshot_rollback();
+        // 保存回滚后的header
+        ret = system_header_save();
+        
         return ret;
     }
 
@@ -370,8 +363,7 @@ int tlv_write(uint16_t tag, const void *data, uint16_t len)
         index = tlv_index_add(&g_tlv_ctx, tag, target_addr);
         if (!index)
         {
-            // 这不应该发生（我们已经检查过）
-            // 但如果发生，需要回滚
+            // 这不应该发生（我们已经检查过），且可以分配脏块给新索引使用
             #if TLV_DEBUG
             tlv_printf("CRITICAL: Index add failed unexpectedly!\n");
             #endif
@@ -389,6 +381,9 @@ int tlv_write(uint16_t tag, const void *data, uint16_t len)
     {
         return ret;
     }
+
+    // ========== 提交事务 ==========
+    transaction_snapshot_commit();
 
     // 更新统计
     g_tlv_ctx.header->total_writes++;
@@ -1565,3 +1560,41 @@ static int tlv_backup_all_internal(void)
 
     return TLV_OK;
 }
+
+/* ============================ 私有函数：快照管理============================ */
+/**
+ * @brief 创建快照
+ */
+static void transaction_snapshot_create(void)
+{
+    g_tlv_ctx.snapshot.next_free_addr = g_tlv_ctx.header->next_free_addr;
+    g_tlv_ctx.snapshot.used_space = g_tlv_ctx.header->used_space;
+    g_tlv_ctx.snapshot.free_space = g_tlv_ctx.header->free_space;
+    g_tlv_ctx.snapshot.fragment_count = g_tlv_ctx.header->fragment_count;
+    g_tlv_ctx.snapshot.fragment_size = g_tlv_ctx.header->fragment_size;
+    g_tlv_ctx.snapshot.is_active = true;
+}
+
+/**
+ * @brief 回滚快照
+ */
+static void transaction_snapshot_rollback(void)
+{
+    if (g_tlv_ctx.snapshot.is_active) {
+        g_tlv_ctx.header->next_free_addr = g_tlv_ctx.snapshot.next_free_addr;
+        g_tlv_ctx.header->used_space = g_tlv_ctx.snapshot.used_space;
+        g_tlv_ctx.header->free_space = g_tlv_ctx.snapshot.free_space;
+        g_tlv_ctx.header->fragment_count = g_tlv_ctx.snapshot.fragment_count;
+        g_tlv_ctx.header->fragment_size = g_tlv_ctx.snapshot.fragment_size;
+        g_tlv_ctx.snapshot.is_active = false;
+    }
+}
+ 
+/**
+ * @brief 提交快照（清除快照标记）
+ */
+static void transaction_snapshot_commit(void)
+{
+    g_tlv_ctx.snapshot.is_active = false;
+}
+

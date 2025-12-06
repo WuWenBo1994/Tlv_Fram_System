@@ -91,6 +91,8 @@ typedef struct
     uint32_t timestamp;   // 写入时间戳
     uint32_t write_count; // 写入计数
 } tlv_data_block_header_t;
+// 数据块大小计算
+#define TLV_BLOCK_SIZE(dataLen) (sizeof(tlv_data_block_header_t) + dataLen + sizeof(uint16_t))
 
 /** 完整的TLV数据块,永远不会实例化这个数组，仅表示数据结构 */
 typedef struct
@@ -144,17 +146,26 @@ typedef struct
     const tlv_meta_const_t *meta; // 指向常量元数据
 } tlv_runtime_info_t;
 
+/** 事务快照结构 */
+typedef struct {
+    uint32_t next_free_addr;    // 快照时的空闲地址
+    uint32_t used_space;        // 快照时的已用空间
+    uint32_t free_space;        // 快照时的可用空间
+    uint32_t fragment_count;    // 快照时的碎片数量
+    uint32_t fragment_size;     // 快照时的碎片大小
+    bool is_active;             // 快照是否激活
+} tlv_transaction_snapshot_t;
+
 /** 全局上下文结构 */
 typedef struct
 {
-    tlv_state_t state;                  // 系统状态
-    tlv_system_header_t *header;        // 系统Header指针
-    tlv_index_table_t *index_table;     // 索引表指针
-    const tlv_meta_const_t *meta_table; // 元数据表
-    uint16_t meta_table_size;           // 元数据表大小
-
-    // 静态分配的缓冲区
-    uint8_t static_buffer[TLV_BUFFER_SIZE];
+    tlv_state_t state;                      // 系统状态
+    tlv_system_header_t *header;            // 系统Header指针
+    tlv_index_table_t *index_table;         // 索引表指针
+    const tlv_meta_const_t *meta_table;     // 元数据表
+    uint16_t meta_table_size;               // 元数据表大小
+    tlv_transaction_snapshot_t snapshot;    // 事务快照
+    uint8_t static_buffer[TLV_BUFFER_SIZE]; // 静态分配的缓冲区
 } tlv_context_t;
 
 /* ============================ 统计结构 ============================ */
