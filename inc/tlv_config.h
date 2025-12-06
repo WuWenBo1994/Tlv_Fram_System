@@ -10,9 +10,7 @@
 #include <stdbool.h>
  
 /* ============================ 版本信息 ============================ */
-#define TLV_FILE_SYSTEM_VERSION_MAJOR   1
-#define TLV_FILE_SYSTEM_VERSION_MINOR   0
-#define TLV_FILE_SYSTEM_VERSION_PATCH   0
+#define TLV_FILE_SYSTEM_VERSION   "1.1.0"
 
 /* ============================ 基础配置 ============================ */
  
@@ -46,6 +44,9 @@
 /** 调试模式     */
 #define TLV_DEBUG                    0
 #define tlv_printf(...)     
+
+/** 使用断言     */
+#define TLV_ENABLE_STATIC_ASSERT      1
 /* ============================ 内存配置 ============================ */
  
 /** 读写缓冲区大小（静态分配） */
@@ -63,7 +64,7 @@
 #define TLV_DATA_ADDR                0x1000
  
 /** 备份区起始地址 */
-#define TLV_BACKUP_ADDR              0x1E000
+#define TLV_BACKUP_ADDR              0x1F000
  
 /** 备份区数据区大小   */
 #define TLV_DATA_REGION_SIZE         (TLV_FRAM_SIZE - TLV_BACKUP_ADDR)
@@ -122,5 +123,40 @@
 #if TLV_MAX_TAG_COUNT > 256
     #error "Too many tags, maximum 256 supported (no hashtable)"
 #endif
- 
+
+/* ============================ 断言检查 ============================ */
+// 静态断言开关宏 - 默认开启，可通过编译器选项关闭
+#ifndef TLV_ENABLE_STATIC_ASSERT
+    #define TLV_ENABLE_STATIC_ASSERT 1
+#endif
+#if TLV_ENABLE_STATIC_ASSERT
+    #if __STDC_VERSION__ >= 201112L
+    // C11及以上版本支持标准_Static_assert
+    #define STATIC_ASSERT_TAG(cond, msg) _Static_assert(cond, #msg)
+    #define STATIC_ASSERT(cond, msg) _Static_assert(cond, msg)
+    #else
+    // C11以下版本使用自定义静态断言
+    // 两层宏展开确保__LINE__正确展开为行号
+    #define CONCAT_IMPL(x, y, z) x##y##_##z
+    #define CONCAT(x, y, z) CONCAT_IMPL(x, y, z)
+
+    // 用于标识符风格的消息
+    #define STATIC_ASSERT_TAG(cond, msg) \
+        typedef char CONCAT(static_assert_, msg, __LINE__)[(cond) ? 1 : -1]
+
+    // 用于字符串风格的消息""
+    #define STATIC_ASSERT(cond, msg) \
+        typedef char CONCAT(static_assert_msg_, __LINE__, unused)[(cond) ? 1 : -1]
+    #endif
+#else
+    // 禁用静态断言
+    #define STATIC_ASSERT_TAG(cond, msg)
+    #define STATIC_ASSERT(cond, msg)
+#endif
+
+// 为了向后兼容，如果没有定义STATIC_ASSERT_MSG，则让它等同于STATIC_ASSERT
+#ifndef STATIC_ASSERT
+    #define STATIC_ASSERT(cond, msg) STATIC_ASSERT_TAG(cond, msg)
+#endif
+
 #endif /* TLV_CONFIG_H */

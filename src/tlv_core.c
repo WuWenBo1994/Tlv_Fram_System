@@ -10,12 +10,6 @@
 #include "tlv_meta_table.h"
 #include "tlv_migration.h"
 
-/* ===================== TLV系统头结构体大小检查 ======================== */
-
-STATIC_CHECK_SIZE(tlv_system_header_t, 256);
-STATIC_CHECK_SIZE(tlv_data_block_header_t, 14);
-STATIC_CHECK_SIZE(tlv_index_entry_t, 8);
-STATIC_CHECK_SIZE(tlv_index_table_t, 2050);
 /* ============================ 全局静态变量 ============================ */
 
 tlv_context_t g_tlv_ctx = {0};
@@ -41,6 +35,11 @@ static void transaction_snapshot_commit(void);
 static void increase_used_space(uint32_t size);
 static void reduce_used_space(uint32_t size);
 
+/* ============================ 版本API实现 ============================ */
+const char *tlv_get_version(void)
+{
+    return TLV_FILE_SYSTEM_VERSION;
+}
 /* ============================ 系统管理API实现 ============================ */
 
 tlv_init_result_t tlv_init(void)
@@ -401,7 +400,7 @@ int tlv_write(uint16_t tag, const void *data, uint16_t len)
     // 检查是否自动整理碎片
 #if TLV_AUTO_CLEAN_FRAGEMENT
     uint32_t fragUsagePercent = 0;
-    ret = tlv_get_fragmentation(&fragUsagePercent);
+    ret = tlv_calculate_fragmentation(&fragUsagePercent);
     if (ret == TLV_OK)
     {
         if (fragUsagePercent >= TLV_AUTO_DEFRAG_THRESHOLD)

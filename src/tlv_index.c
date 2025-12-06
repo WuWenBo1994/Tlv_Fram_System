@@ -423,7 +423,7 @@ int tlv_index_remove(tlv_context_t *ctx, uint16_t tag)
 static const tlv_meta_const_t *find_meta_by_tag(tlv_context_t *ctx, uint16_t tag)
 {
 	    // 参数有效性检查
-    if (!ctx || !ctx->meta_table || ctx->meta_table_size == 0 || )
+    if (!ctx || !ctx->meta_table || ctx->meta_table_size == 0 || tag == 0)
     {
         return NULL;
     }

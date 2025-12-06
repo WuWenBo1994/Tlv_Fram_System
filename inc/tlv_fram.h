@@ -14,7 +14,12 @@ extern "C" {
 #endif
  
 /* ============================ 系统管理API ============================ */
- 
+/**
+ * @brief 获取tlv系统版本
+ * @return 系统版本
+ */
+const char* tlv_get_version(void); 
+
 /**
  * @brief 初始化TLV存储系统
  * @return 初始化结果

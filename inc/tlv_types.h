@@ -12,14 +12,6 @@
 #include <stdbool.h>
 #include <stddef.h>
 
-#define STATIC_CHECK_SIZE(type, expected) \
-    char check_##type[(sizeof(type) == expected) ? 1 : -1]
-
-#define STATIC_GATHER_CHECK(now, expected) \
-    char check_gather_##now[(now >= expected) ? 1 : -1]
-
-#define STATIC_LESS_CHECK(now, expected) \
-    char check_less_##now[(now <= expected) ? 1 : -1]
 /* ============================ 基础类型 ============================ */
 
 /** TLV状态枚举 */
@@ -153,13 +145,14 @@ typedef struct
 } tlv_runtime_info_t;
 
 /** 事务快照结构 */
-typedef struct {
-    uint32_t next_free_addr;    // 快照时的空闲地址
-    uint32_t used_space;        // 快照时的已用空间
-    uint32_t free_space;        // 快照时的可用空间
-    uint32_t fragment_count;    // 快照时的碎片数量
-    uint32_t fragment_size;     // 快照时的碎片大小
-    bool is_active;             // 快照是否激活
+typedef struct
+{
+    uint32_t next_free_addr; // 快照时的空闲地址
+    uint32_t used_space;     // 快照时的已用空间
+    uint32_t free_space;     // 快照时的可用空间
+    uint32_t fragment_count; // 快照时的碎片数量
+    uint32_t fragment_size;  // 快照时的碎片大小
+    bool is_active;          // 快照是否激活
 } tlv_transaction_snapshot_t;
 
 /** 全局上下文结构 */
@@ -202,5 +195,18 @@ typedef struct
 #define TLV_REGIONS_OVERLAP(start1, size1, start2, size2)         \
     (((start1) <= (start2) && (start2) < ((start1) + (size1))) || \
      ((start2) <= (start1) && (start1) < ((start2) + (size2))))
+
+/** 编译期检查 */
+STATIC_ASSERT(sizeof(tlv_system_header_t) == 256, "tlv_system_header_t size == 256");
+STATIC_ASSERT(sizeof(tlv_data_block_header_t) == 14, "tlv_data_block_header_t size == 14");
+STATIC_ASSERT(sizeof(tlv_index_entry_t) == 8, "tlv_index_entry_t size == 8");
+STATIC_ASSERT(sizeof(tlv_index_table_t) == 2050, "tlv_index_table_t size == 2050");
+
+// 检查索引区域一定大于系统头大小
+STATIC_ASSERT(TLV_INDEX_ADDR >= sizeof(tlv_system_header_t), "TLV_INDEX_ADDR > tlv_system_header_t size");
+// 检查数据区域一定大于索引区域大小
+STATIC_ASSERT(TLV_DATA_ADDR >= TLV_INDEX_ADDR + sizeof(tlv_index_table_t), "TLV_DATA_ADDR > tlv_index_table_t size");
+// 检查备份数据区域大小一定等于系统头及索引区域预留大小
+STATIC_ASSERT(TLV_DATA_ADDR - TLV_HEADER_ADDR == TLV_DATA_REGION_SIZE, "TLV_BACKUP_ADDR_size must == tlv_system_header_t and tlv_index_table_t reserve size");
 
 #endif /* TLV_TYPES_H */
