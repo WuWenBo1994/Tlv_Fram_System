@@ -54,7 +54,7 @@ void tlv_index_deinit(const tlv_context_t *ctx)
     }
 
     /* 静态分配的内存,只需要将指针置空,无需实际释放 */
-	tlv_context_t *ctx_ = (tlv_context_t *)ctx;
+    tlv_context_t *ctx_ = (tlv_context_t *)ctx;
     ctx_->header = NULL;
     ctx_->index_table = NULL;
 }
