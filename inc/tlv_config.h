@@ -10,7 +10,7 @@
 #include <stdbool.h>
  
 /* ============================ 版本信息 ============================ */
-#define TLV_FILE_SYSTEM_VERSION   "1.1.0"
+#define TLV_FILE_SYSTEM_VERSION   "1.2.0"
 
 /* ============================ 基础配置 ============================ */
  
@@ -42,8 +42,7 @@
 #define TLV_AUTO_DEFRAG_THRESHOLD    20
 
 /** 调试模式     */
-#define TLV_DEBUG                    0
-#define tlv_printf(...)     
+#define TLV_DEBUG                    0 
 
 /** 使用断言     */
 #define TLV_ENABLE_STATIC_ASSERT      1
@@ -84,7 +83,6 @@
 /** 数据块魔数 */
 #define TLV_BLOCK_MAGIC              0x44415441  // "DATA"
  
-
 /* ============================ 错误代码 ============================ */
  
 /** 成功 */
@@ -157,6 +155,22 @@
 // 为了向后兼容，如果没有定义STATIC_ASSERT_MSG，则让它等同于STATIC_ASSERT
 #ifndef STATIC_ASSERT
     #define STATIC_ASSERT(cond, msg) STATIC_ASSERT_TAG(cond, msg)
+#endif
+
+
+#if TLV_DEBUG
+    #define TLV_ASSERT(cond) \
+        do { \
+            if (!(cond)) { \
+                printf("TLV_ASSERT failed: %s:%d\n", __FILE__, __LINE__); \
+                while (1); \
+            } \
+        } while (0)
+
+    #define tlv_printf(...)   printf(__VA_ARGS__)
+#else
+    #define TLV_ASSERT(cond)
+    #define tlv_printf(...)   
 #endif
 
 #endif /* TLV_CONFIG_H */

@@ -95,7 +95,7 @@ uint16_t tlv_crc16_update(uint16_t crc, const void *data, uint32_t size)
  */
 uint16_t tlv_crc16_final(uint16_t crc)
 {
-    // 对于ModBus CRC,通常不需要额外处理,直接返回即可
+    // 交换高低字节顺序，低字节在前
     return crc >> 8 | (crc << 8);
 }
 

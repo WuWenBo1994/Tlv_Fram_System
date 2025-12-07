@@ -7,7 +7,6 @@
 #define TLV_TYPES_H
 
 #include "tlv_config.h"
-#include "tlv_migration.h"
 #include <stdint.h>
 #include <stdbool.h>
 #include <stddef.h>

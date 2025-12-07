@@ -9,10 +9,6 @@
 #include "tlv_meta_table.h"
 #include <string.h>
 
-/* ============================ 外部变量 ============================ */
-
-extern tlv_context_t g_tlv_ctx;
-
 /* ============================ 私有变量 ============================ */
 
 static uint32_t g_migrated_count = 0;
@@ -20,15 +16,20 @@ static uint32_t g_failed_count = 0;
 
 /* ============================ 辅助函数 ============================ */
 
-static const tlv_meta_const_t *get_meta(uint16_t tag)
+static const tlv_meta_const_t *get_meta(const tlv_context_t *ctx, uint16_t tag)
 {
-    for (uint32_t i = 0; i < g_tlv_ctx.meta_table_size; i++)
+    if (!ctx || !ctx->meta_table || tag == 0)
     {
-        if (g_tlv_ctx.meta_table[i].tag == tag)
+        return NULL;
+    }
+
+    for (uint32_t i = 0; i < ctx->meta_table_size; i++)
+    {
+        if (ctx->meta_table[i].tag == tag)
         {
-            return &g_tlv_ctx.meta_table[i];
+            return &ctx->meta_table[i];
         }
-        if (g_tlv_ctx.meta_table[i].tag == 0xFFFF)
+        if (ctx->meta_table[i].tag == 0xFFFF)
         {
             break;
         }
@@ -54,20 +55,21 @@ static const tlv_meta_const_t *get_meta(uint16_t tag)
  * @note 迁移函数必须能够在同一缓冲区中完成转换
  *       如果需要临时空间,使用栈上的小变量（<256B）
  */
-int tlv_migrate_tag(uint16_t tag,
+int tlv_migrate_tag(const tlv_context_t *ctx,
+                    uint16_t tag,
                     void *data,
                     uint16_t old_len,
                     uint16_t *new_len,
                     uint16_t max_size,
                     uint8_t current_ver)
 {
-    if (!data || !new_len || max_size == 0)
+    if (!ctx || !data || !new_len || max_size == 0)
     {
         return TLV_ERROR_INVALID_PARAM;
     }
 
     // 查找元数据
-    const tlv_meta_const_t *meta = get_meta(tag);
+    const tlv_meta_const_t *meta = get_meta(ctx, tag);
     if (!meta)
     {
         return TLV_ERROR_NOT_FOUND;
@@ -83,12 +85,10 @@ int tlv_migrate_tag(uint16_t tag,
 
     if (current_ver > meta->version)
     {
-		// 版本回退,不支持
-        #if TLV_DEBUG
+        // 版本回退,不支持
         tlv_printf("ERROR: Version downgrade not supported\n");
         tlv_printf("  Tag: 0x%04X, Current: %u, Target: %u\n",
-               tag, current_ver, meta->version);
-        #endif
+                   tag, current_ver, meta->version);
         return TLV_ERROR_VERSION;
     }
 
@@ -96,11 +96,9 @@ int tlv_migrate_tag(uint16_t tag,
     if (!meta->migrate)
     {
         // 没有迁移函数,无法升级
-        #if TLV_DEBUG
         tlv_printf("ERROR: No migration function for tag 0x%04X\n", tag);
         tlv_printf("  Current version: %u, Expected: %u\n",
-               current_ver, meta->version);
-        #endif
+                   current_ver, meta->version);
         return TLV_ERROR_VERSION;
     }
 
@@ -110,37 +108,29 @@ int tlv_migrate_tag(uint16_t tag,
 
     if (ret != TLV_OK)
     {
-        #if TLV_DEBUG
         tlv_printf("ERROR: Migration failed for tag 0x%04X\n", tag);
         tlv_printf("  Error code: %d\n", ret);
-        #endif
         return ret;
     }
 
     // 验证结果
     if (*new_len > meta->max_length)
     {
-        #if TLV_DEBUG
         tlv_printf("ERROR: Migration result too large\n");
         tlv_printf("  Tag: 0x%04X, Result: %u, Max: %u\n",
-               tag, *new_len, meta->max_length);
-        #endif
+                   tag, *new_len, meta->max_length);
         return TLV_ERROR_INVALID_PARAM;
     }
 
     if (*new_len > max_size)
     {
-        #if TLV_DEBUG
         tlv_printf("ERROR: Migration result exceeds buffer\n");
         tlv_printf("  Tag: 0x%04X, Result: %u, Buffer: %u\n",
-               tag, *new_len, max_size);
-        #endif
+                   tag, *new_len, max_size);
         return TLV_ERROR_INVALID_PARAM;
     }
-    #if TLV_DEBUG
     tlv_printf("Migration successful: Tag 0x%04X, v%u -> v%u, %u -> %u bytes\n",
-           tag, current_ver, meta->version, old_len, *new_len);
-    #endif
+               tag, current_ver, meta->version, old_len, *new_len);
 
     return TLV_OK;
 }
@@ -149,7 +139,13 @@ int tlv_migrate_tag(uint16_t tag,
 
 int tlv_migrate_all(void)
 {
-    if (g_tlv_ctx.state != TLV_STATE_INITIALIZED)
+    extern const tlv_context_t *tlv_get_context(void);
+    const tlv_context_t *ctx = tlv_get_context();
+    if (!ctx || !ctx->index_table)
+    {
+        return TLV_ERROR_INVALID_PARAM;
+    }
+    if (ctx->state != TLV_STATE_INITIALIZED)
     {
         return TLV_ERROR;
     }
@@ -160,7 +156,7 @@ int tlv_migrate_all(void)
     // 遍历所有索引
     for (int i = 0; i < TLV_MAX_TAG_COUNT; i++)
     {
-        tlv_index_entry_t *entry = &g_tlv_ctx.index_table->entries[i];
+        tlv_index_entry_t *entry = &ctx->index_table->entries[i];
 
         if (entry->tag == 0 || !(entry->flags & TLV_FLAG_VALID))
         {
@@ -168,7 +164,7 @@ int tlv_migrate_all(void)
         }
 
         // 查找元数据
-        const tlv_meta_const_t *meta = get_meta(entry->tag);
+        const tlv_meta_const_t *meta = get_meta(ctx, entry->tag);
         if (!meta)
         {
             continue; // Tag不在元数据表中,跳过
@@ -183,10 +179,8 @@ int tlv_migrate_all(void)
         if (entry->version > meta->version)
         {
             // 版本降级,警告但跳过
-            #if TLV_DEBUG
             tlv_printf("WARNING: Tag 0x%04X version downgrade detected (v%u -> v%u)\n",
-                   entry->tag, entry->version, meta->version);
-            #endif
+                       entry->tag, entry->version, meta->version);
             g_failed_count++;
             continue;
         }
@@ -194,10 +188,8 @@ int tlv_migrate_all(void)
         if (!meta->migrate)
         {
             // 无迁移函数,警告但跳过
-            #if TLV_DEBUG
             tlv_printf("WARNING: Tag 0x%04X needs migration but no function provided\n",
-                   entry->tag);
-            #endif
+                       entry->tag);
             g_failed_count++;
             continue;
         }
@@ -218,16 +210,14 @@ int tlv_migrate_all(void)
         else if (meta->max_length <= TLV_BUFFER_SIZE)
         {
             // 中等数据：使用全局静态缓冲区
-            buffer = g_tlv_ctx.static_buffer;
+            buffer = (uint8_t *)ctx->static_buffer;
             buffer_size = TLV_BUFFER_SIZE;
         }
         else
         {
             // 数据太大,跳过
-            #if TLV_DEBUG
             tlv_printf("ERROR: Tag 0x%04X too large for migration (%u bytes)\n",
-                   entry->tag, meta->max_length);
-            #endif
+                       entry->tag, meta->max_length);
             g_failed_count++;
             continue;
         }
@@ -243,7 +233,7 @@ int tlv_migrate_all(void)
 
         // 迁移数据(原地)
         uint16_t new_len = 0;
-        ret = tlv_migrate_tag(entry->tag, buffer, read_len, &new_len,
+        ret = tlv_migrate_tag(ctx, entry->tag, buffer, read_len, &new_len,
                               buffer_size, entry->version);
         if (ret != TLV_OK)
         {

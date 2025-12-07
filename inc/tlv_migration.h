@@ -14,6 +14,7 @@ extern "C" {
 
 /**
  * @brief 迁移单个Tag（内部函数）
+ * @param ctx 存储上下文
  * @param tag Tag标识
  * @param data 数据缓冲区（输入旧数据,输出新数据）
  * @param old_len 旧数据长度
@@ -22,7 +23,8 @@ extern "C" {
  * @param current_ver 当前版本
  * @return 0: 成功
  */
-int tlv_migrate_tag(uint16_t tag,
+int tlv_migrate_tag(const tlv_context_t *ctx,
+                    uint16_t tag,
                     void *data,
                     uint16_t old_len,
                     uint16_t *new_len,
