@@ -19,34 +19,34 @@ extern "C" {
  * @param ctx 全局上下文
  * @return 0: 成功, 其他: 错误码
  */
-int tlv_index_init(tlv_context_t *ctx);
+int tlv_index_init(const tlv_context_t *ctx);
  
 /**
  * @brief 反初始化索引系统
  * @param ctx 全局上下文
  */
-void tlv_index_deinit(tlv_context_t *ctx);
+void tlv_index_deinit(const tlv_context_t *ctx);
  
 /**
  * @brief 从FRAM加载索引表
  * @param ctx 全局上下文
  * @return 0: 成功, 其他: 错误码
  */
-int tlv_index_load(tlv_context_t *ctx);
+int tlv_index_load(const tlv_context_t *ctx);
  
 /**
  * @brief 将索引表保存到FRAM
  * @param ctx 全局上下文
  * @return 0: 成功, 其他: 错误码
  */
-int tlv_index_save(tlv_context_t *ctx);
+int tlv_index_save(const tlv_context_t *ctx);
  
 /**
  * @brief 校验索引表完整性
  * @param ctx 全局上下文
  * @return 0: 成功, 其他: 错误码
  */
-int tlv_index_verify(tlv_context_t *ctx);
+int tlv_index_verify(const tlv_context_t *ctx);
  
 /* ============================ 索引查找 ============================ */
  
@@ -56,7 +56,7 @@ int tlv_index_verify(tlv_context_t *ctx);
  * @param tag Tag值
  * @return 索引指针,NULL表示未找到
  */
-tlv_index_entry_t* tlv_index_find(tlv_context_t *ctx, uint16_t tag);
+tlv_index_entry_t* tlv_index_find(const tlv_context_t *ctx, uint16_t tag);
  
 /**
  * @brief 快速查找（优化版）
@@ -64,14 +64,14 @@ tlv_index_entry_t* tlv_index_find(tlv_context_t *ctx, uint16_t tag);
  * @param tag Tag值
  * @return 索引指针,NULL表示未找到
  */
-tlv_index_entry_t* tlv_index_find_fast(tlv_context_t *ctx, uint16_t tag);
+tlv_index_entry_t* tlv_index_find_fast(const tlv_context_t *ctx, uint16_t tag);
  
 /**
  * @brief 查找空闲索引槽位
  * @param ctx 全局上下文
  * @return 索引指针,NULL表示已满
  */
-tlv_index_entry_t* tlv_index_find_free_slot(tlv_context_t *ctx);
+tlv_index_entry_t* tlv_index_find_free_slot(const tlv_context_t *ctx);
  
 /* ============================ 索引操作 ============================ */
  
@@ -82,7 +82,7 @@ tlv_index_entry_t* tlv_index_find_free_slot(tlv_context_t *ctx);
  * @param addr 数据地址
  * @return 索引指针,NULL表示失败
  */
-tlv_index_entry_t* tlv_index_add(tlv_context_t *ctx, uint16_t tag, uint32_t addr);
+tlv_index_entry_t* tlv_index_add(const tlv_context_t *ctx, uint16_t tag, uint32_t addr);
  
 /**
  * @brief 更新索引
@@ -91,7 +91,7 @@ tlv_index_entry_t* tlv_index_add(tlv_context_t *ctx, uint16_t tag, uint32_t addr
  * @param addr 新数据地址
  * @return 0: 成功, 其他: 错误码
  */
-int tlv_index_update(tlv_context_t *ctx, uint16_t tag, uint32_t addr);
+int tlv_index_update(const tlv_context_t *ctx, uint16_t tag, uint32_t addr);
  
 /**
  * @brief 删除索引
@@ -99,7 +99,7 @@ int tlv_index_update(tlv_context_t *ctx, uint16_t tag, uint32_t addr);
  * @param tag Tag值
  * @return 0: 成功, 其他: 错误码
  */
-int tlv_index_remove(tlv_context_t *ctx, uint16_t tag);
+int tlv_index_remove(const tlv_context_t *ctx, uint16_t tag);
  
 #ifdef __cplusplus
 }
