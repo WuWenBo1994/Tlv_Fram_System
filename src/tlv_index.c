@@ -10,7 +10,7 @@
 
 /* ============================ 私有函数声明 ============================ */
 
-static const tlv_meta_const_t *find_meta_by_tag(const const tlv_context_t *ctx, uint16_t tag);
+static const tlv_meta_const_t *find_meta_by_tag(const tlv_context_t *ctx, uint16_t tag);
 static bool is_tag_region_valid(uint16_t tag, uint32_t addr, uint32_t size);
 
 /* ============================ 索引表管理实现 ============================ */
@@ -26,7 +26,7 @@ static bool is_tag_region_valid(uint16_t tag, uint32_t addr, uint32_t size);
  * @return TLV_OK 成功初始化
  * @return TLV_ERROR_INVALID_PARAM 参数无效(ctx为NULL)
  */
-int tlv_index_init(const const tlv_context_t *ctx)
+int tlv_index_init(const tlv_context_t *ctx)
 {
     if (!ctx || !ctx->header || !ctx->index_table)
     {
@@ -253,7 +253,7 @@ tlv_index_entry_t *tlv_index_find_fast(const tlv_context_t *ctx, uint16_t tag)
 
 tlv_index_entry_t *tlv_index_find_free_slot(const tlv_context_t *ctx)
 {
-    if (!ctx || !ctx->index_table)
+    if (!ctx || !ctx->index_table || !ctx->header)
     {
         return NULL;
     }

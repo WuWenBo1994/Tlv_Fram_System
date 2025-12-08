@@ -151,6 +151,7 @@ typedef struct
     uint32_t free_space;     // 快照时的可用空间
     uint32_t fragment_count; // 快照时的碎片数量
     uint32_t fragment_size;  // 快照时的碎片大小
+    uint32_t tag_count;      // 快照时的Tag数量
     bool is_active;          // 快照是否激活
 } tlv_transaction_snapshot_t;
 

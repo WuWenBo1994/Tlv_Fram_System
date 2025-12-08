@@ -15,7 +15,6 @@ static uint32_t g_migrated_count = 0;
 static uint32_t g_failed_count = 0;
 
 /* ============================ 辅助函数 ============================ */
-
 static const tlv_meta_const_t *get_meta(const tlv_context_t *ctx, uint16_t tag)
 {
     if (!ctx || !ctx->meta_table || tag == 0)
@@ -224,7 +223,8 @@ int tlv_migrate_all(void)
 
         // 读取旧数据
         uint16_t read_len = buffer_size;
-        int ret = tlv_read(entry->tag, buffer, &read_len);
+        extern int read_data_block(uint32_t addr, void *buf, uint16_t *len);
+        int ret = read_data_block(entry->data_addr, buffer, &read_len);
         if (ret != TLV_OK)
         {
             g_failed_count++;

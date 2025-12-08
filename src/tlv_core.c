@@ -232,6 +232,12 @@ int tlv_write(uint16_t tag, const void *data, uint16_t len)
         return TLV_ERROR_INVALID_PARAM;
     }
 
+    // 添加对上下文完整性的检查
+    if (!g_tlv_ctx.header || !g_tlv_ctx.index_table)
+    {
+        return TLV_ERROR_INVALID_PARAM;
+    }
+
     if (g_tlv_ctx.state != TLV_STATE_INITIALIZED)
     {
         return TLV_ERROR;
@@ -357,8 +363,8 @@ int tlv_write(uint16_t tag, const void *data, uint16_t len)
             g_tlv_ctx.header->fragment_size += old_block_size;
         }
 
-        index = tlv_index_add(&g_tlv_ctx, tag, target_addr);
-        if (!index)
+        tlv_index_entry_t *new_index = tlv_index_add(&g_tlv_ctx, tag, target_addr);
+        if (!new_index)
         {
             // 这不应该发生（我们已经检查过）,且可以分配脏块给新索引使用
             tlv_printf("CRITICAL: Index add failed unexpectedly!\n");
@@ -786,6 +792,8 @@ static void sort_index_table_inplace(void)
     int write_idx = 0;
     for (int i = 0; i < TLV_MAX_TAG_COUNT; i++)
     {
+        if (write_idx >= TLV_MAX_TAG_COUNT)
+            break;
         tlv_index_entry_t *entry = &g_tlv_ctx.index_table->entries[i];
 
         if (entry->tag != 0 && (entry->flags & TLV_FLAG_VALID))
@@ -800,7 +808,7 @@ static void sort_index_table_inplace(void)
 
     int total_valid = write_idx;
 
-    if (total_valid == 0)
+    if (total_valid <= 0 || total_valid >= TLV_MAX_TAG_COUNT)
     {
         return;
     }
@@ -1008,7 +1016,7 @@ int tlv_defragment(void)
     // 更新系统Header
     uint32_t region_size = TLV_BACKUP_ADDR - TLV_DATA_ADDR;
     uint32_t new_allocated = total_used;
-    uint32_t new_free_space = region_size - new_allocated;
+    uint32_t new_free_space = (region_size > new_allocated) ? (region_size - new_allocated) : 0;
 
     g_tlv_ctx.header->data_region_start = TLV_DATA_ADDR;
     g_tlv_ctx.header->data_region_size = region_size;
@@ -1473,7 +1481,7 @@ static int write_data_block(uint16_t tag, const void *data, uint16_t len, uint32
     return ret;
 }
 
-static int read_data_block(uint32_t addr, void *buf, uint16_t *len)
+int read_data_block(uint32_t addr, void *buf, uint16_t *len)
 {
     // 读取Header
     tlv_data_block_header_t header;
@@ -1587,6 +1595,7 @@ static void transaction_snapshot_create(void)
     g_tlv_ctx.snapshot.free_space = g_tlv_ctx.header->free_space;
     g_tlv_ctx.snapshot.fragment_count = g_tlv_ctx.header->fragment_count;
     g_tlv_ctx.snapshot.fragment_size = g_tlv_ctx.header->fragment_size;
+    g_tlv_ctx.snapshot.tag_count = g_tlv_ctx.header->tag_count;
     g_tlv_ctx.snapshot.is_active = true;
 }
 
@@ -1602,6 +1611,7 @@ static void transaction_snapshot_rollback(void)
         g_tlv_ctx.header->free_space = g_tlv_ctx.snapshot.free_space;
         g_tlv_ctx.header->fragment_count = g_tlv_ctx.snapshot.fragment_count;
         g_tlv_ctx.header->fragment_size = g_tlv_ctx.snapshot.fragment_size;
+        g_tlv_ctx.header->tag_count = g_tlv_ctx.snapshot.tag_count;
         g_tlv_ctx.snapshot.is_active = false;
     }
 }
