@@ -223,7 +223,7 @@ tlv_state_t tlv_get_state(void)
  * @param tag Tag值
  * @param data 数据指针
  * @param len 数据长度
- * @return 实际写入长度,负数表示错误
+ * @return 0: 成功, 其他: 错误码
  * @note 数据的写入过程是数据先落盘,但索引是提交点,只有索引落盘了,数据才可见
  */
 int tlv_write(uint16_t tag, const void *data, uint16_t len)
@@ -415,7 +415,7 @@ int tlv_write(uint16_t tag, const void *data, uint16_t len)
     }
 #endif
 
-    return len; // 返回写入长度
+    return TLV_OK;
 }
 
 /**

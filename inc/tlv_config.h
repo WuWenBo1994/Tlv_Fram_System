@@ -10,7 +10,7 @@
 #include <stdbool.h>
  
 /* ============================ 版本信息 ============================ */
-#define TLV_FILE_SYSTEM_VERSION   "1.3.0"
+#define TLV_FILE_SYSTEM_VERSION   "1.3.1"
 
 /* ============================ 基础配置 ============================ */
  
@@ -45,7 +45,7 @@
 #define TLV_DEBUG                    0 
 
 /** 使用断言     */
-#define TLV_ENABLE_STATIC_ASSERT      1
+#define TLV_ENABLE_STATIC_ASSERT     1
 /* ============================ 内存配置 ============================ */
  
 /** 读写缓冲区大小（静态分配） */
