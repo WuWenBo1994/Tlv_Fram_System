@@ -181,6 +181,57 @@ typedef struct
     uint32_t corruption_count; // 损坏计数
 } tlv_statistics_t;
 #pragma pack()
+
+/* ============================ 流式操作相关 ============================ */
+/** 流句柄类型（不透明类型） */
+typedef int32_t tlv_stream_handle_t;
+
+/** 无效句柄定义 */
+#define TLV_STREAM_INVALID_HANDLE ((tlv_stream_handle_t) - 1)
+
+/** 流句柄状态 */
+typedef enum
+{
+    TLV_STREAM_STATE_IDLE = 0,    // 空闲
+    TLV_STREAM_STATE_WRITING = 1, // 写入中
+    TLV_STREAM_STATE_READING = 2, // 读取中
+} tlv_stream_state_t;
+
+/** 流句柄内部结构（用户不可见） */
+typedef struct
+{
+    uint16_t tag;                 // Tag值
+    uint32_t data_addr;           // 数据块起始地址
+    uint32_t current_offset;      // 当前读写偏移（相对于 data_addr）
+    uint16_t total_len;           // 总数据长度
+    uint16_t processed_len;       // 已处理长度（已写入/已读取）
+    uint16_t crc16;               // 累积的 CRC16
+    uint8_t state;                // 句柄状态
+    uint8_t old_version;          // 旧版本号（用于写入后更新索引）
+    tlv_index_entry_t *old_index; // 旧索引指针（用于标记脏块）
+    uint32_t old_block_size;      // 旧块大小（用于碎片统计）
+    uint32_t magic;               // 魔数（用于验证句柄有效性）
+} tlv_stream_context_internal_t;
+
+/** 流式操作上下文 */
+typedef struct
+{
+    tlv_stream_context_internal_t handles[TLV_MAX_STREAM_HANDLES];
+} tlv_stream_context_t;
+
+/** 句柄魔数（用于验证） */
+#define TLV_STREAM_MAGIC 0x53545246 // "STRF" (STReam Frame)
+/* ============================ 错误上下文 ============================ */
+ 
+/** 错误信息结构 */
+typedef struct {
+    int error_code;              // 最后一次错误码
+    uint32_t timestamp;          // 错误发生时间戳
+    uint16_t tag;                // 相关的 tag（如果适用）
+    uint32_t line;               // 错误发生的代码行号（调试用）
+    const char *function;        // 错误发生的函数名（调试用）
+} tlv_error_context_t;
+
 /* ============================ 地址范围检查宏 ============================ */
 
 /** 检查地址是否在有效范围内 */

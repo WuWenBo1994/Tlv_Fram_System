@@ -11,12 +11,41 @@
 #include "tlv_migration.h"
 
 /* ============================ 全局静态变量 ============================ */
-
+/* 存储系统上下文 */
 static tlv_context_t g_tlv_ctx = {0};
 
 /* 静态分配的内存（替代malloc） */
 static tlv_system_header_t g_static_header;
 static tlv_index_table_t g_static_index;
+
+/* 流式操作上下文 */
+static tlv_stream_context_t g_stream_ctx = {0};
+
+/* 错误上下文 */
+static tlv_error_context_t g_last_error = {0};
+/* ============================ 错误处理宏 ============================ */
+
+#if TLV_DEBUG
+/**
+ * @brief 记录错误并返回
+ * @param err 错误码
+ * @param tag_val 相关的 tag（可选，传0表示无关）
+ */
+#define TLV_SET_ERROR(err, tag_val) \
+    tlv_set_last_error((err), (tag_val), __LINE__, __func__)
+
+#define TLV_TAG_ERROR(err) \
+    tlv_set_last_error((err), (tag), __LINE__, __func__)
+
+#else
+/**
+ * @brief 精简版（不记录行号和函数名）
+ */
+#define TLV_SET_ERROR(err, tag_val) \
+    tlv_set_last_error((err), (tag_val), 0, NULL)
+#define TLV_TAG_ERROR(err) \
+    tlv_set_last_error((err), (tag), 0, NULL)
+#endif
 
 /* ============================ 私有函数声明 ============================ */
 
@@ -33,6 +62,7 @@ static void transaction_snapshot_rollback(void);
 static void transaction_snapshot_commit(void);
 static void increase_used_space(uint32_t size);
 static void reduce_used_space(uint32_t size);
+static int tlv_set_last_error(int error_code, uint16_t tag, uint32_t line, const char *function);
 
 /* ============================ 版本API实现 ============================ */
 const char *tlv_get_version(void)
@@ -1638,3 +1668,848 @@ static void reduce_used_space(uint32_t size)
 {
     g_tlv_ctx.header->used_space -= size;
 }
+
+/* ============================ 流式操作私有函数 ============================ */
+
+/**
+ * @brief 句柄索引转换为句柄
+ * @param index 内部索引
+ * @return 句柄
+ */
+static inline tlv_stream_handle_t index_to_handle(int index)
+{
+    if (index < 0 || index >= TLV_MAX_STREAM_HANDLES)
+    {
+        return TLV_STREAM_INVALID_HANDLE;
+    }
+    // 句柄编码：高16位是魔数，低16位是索引
+    return (tlv_stream_handle_t)((TLV_STREAM_MAGIC & 0xFFFF0000) | (index & 0xFFFF));
+}
+
+/**
+ * @brief 句柄转换为索引
+ * @param handle 句柄
+ * @return 索引（-1 表示无效）
+ */
+static inline int handle_to_index(tlv_stream_handle_t handle)
+{
+    // 验证魔数
+    if ((handle & 0xFFFF0000) != (TLV_STREAM_MAGIC & 0xFFFF0000))
+    {
+        return -1;
+    }
+
+    int index = handle & 0xFFFF;
+    if (index < 0 || index >= TLV_MAX_STREAM_HANDLES)
+    {
+        return -1;
+    }
+
+    return index;
+}
+
+/**
+ * @brief 查找空闲的流句柄
+ * @return 句柄（TLV_INVALID_HANDLE 表示失败）
+ */
+static tlv_stream_handle_t find_free_stream_handle(void)
+{
+    for (int i = 0; i < TLV_MAX_STREAM_HANDLES; i++)
+    {
+        if (g_stream_ctx.handles[i].state == TLV_STREAM_STATE_IDLE)
+        {
+            // 清空并初始化魔数
+            memset(&g_stream_ctx.handles[i], 0, sizeof(tlv_stream_context_internal_t));
+            g_stream_ctx.handles[i].magic = TLV_STREAM_MAGIC;
+            return index_to_handle(i);
+        }
+    }
+    return TLV_STREAM_INVALID_HANDLE;
+}
+
+/**
+ * @brief 验证句柄有效性并获取内部结构
+ * @param handle 句柄
+ * @param expected_state 期望的状态
+ * @return 内部结构指针（NULL 表示无效）
+ */
+static tlv_stream_context_internal_t *validate_and_get_handle(
+    tlv_stream_handle_t handle,
+    tlv_stream_state_t expected_state)
+{
+    int index = handle_to_index(handle);
+    if (index < 0)
+    {
+        return NULL;
+    }
+
+    tlv_stream_context_internal_t *h = &g_stream_ctx.handles[index];
+
+    // 验证魔数
+    if (h->magic != TLV_STREAM_MAGIC)
+    {
+        return NULL;
+    }
+
+    // 验证状态
+    if (h->state != expected_state)
+    {
+        return NULL;
+    }
+
+    return h;
+}
+
+/**
+ * @brief 释放流句柄
+ * @param handle 句柄
+ */
+static void release_stream_handle(tlv_stream_handle_t handle)
+{
+    int index = handle_to_index(handle);
+    if (index >= 0 && index < TLV_MAX_STREAM_HANDLES)
+    {
+        memset(&g_stream_ctx.handles[index], 0, sizeof(tlv_stream_context_internal_t));
+    }
+}
+/* ============================ 流式写入API ============================ */
+
+/**
+ * @brief 开始分段写入
+ * @param tag Tag值
+ * @param total_len 总数据长度
+ * @return 写入句柄（TLV_INVALID_HANDLE 表示失败，通过 tlv_get_last_error() 获取错误码）
+ */
+tlv_stream_handle_t tlv_write_begin(uint16_t tag, uint16_t total_len)
+{
+    if (tag == 0 || total_len == 0)
+    {
+        TLV_TAG_ERROR(TLV_ERROR_INVALID_PARAM);
+        return TLV_STREAM_INVALID_HANDLE;
+    }
+
+    if (!g_tlv_ctx.header || !g_tlv_ctx.index_table)
+    {
+        TLV_TAG_ERROR(TLV_ERROR_INVALID_PARAM);
+        return TLV_STREAM_INVALID_HANDLE;
+    }
+
+    if (g_tlv_ctx.state != TLV_STATE_INITIALIZED)
+    {
+        TLV_TAG_ERROR(TLV_ERROR);
+        return TLV_STREAM_INVALID_HANDLE;
+    }
+
+    // 查找元数据
+    const tlv_meta_const_t *meta = get_meta(tag);
+    if (!meta)
+    {
+        TLV_TAG_ERROR(TLV_ERROR_NOT_FOUND);
+        return TLV_STREAM_INVALID_HANDLE;
+    }
+
+    // 检查长度
+    if (total_len > meta->max_length)
+    {
+        TLV_TAG_ERROR(TLV_ERROR_INVALID_PARAM);
+        return TLV_STREAM_INVALID_HANDLE;
+    }
+
+    // 查找空闲句柄
+    tlv_stream_handle_t handle = find_free_stream_handle();
+    if (handle == TLV_STREAM_INVALID_HANDLE)
+    {
+        TLV_TAG_ERROR(TLV_ERROR_INVALID_HANDLE);
+        return TLV_STREAM_INVALID_HANDLE;
+    }
+
+    int index = handle_to_index(handle);
+    tlv_stream_context_internal_t *h = &g_stream_ctx.handles[index];
+
+    // 创建事务快照
+    transaction_snapshot_create();
+
+    // 查找现有索引
+    tlv_index_entry_t *idx = tlv_index_find(&g_tlv_ctx, tag);
+    uint32_t target_addr;
+    uint32_t old_block_size = 0;
+    uint32_t new_block_size = TLV_BLOCK_SIZE(total_len);
+    bool need_add_index = false;
+    bool has_free_slot = g_tlv_ctx.header->tag_count < TLV_MAX_TAG_COUNT;
+
+    h->old_index = NULL;
+    h->old_block_size = 0;
+
+    if (idx && (idx->flags & TLV_FLAG_VALID))
+    {
+        // 读取旧Header
+        tlv_data_block_header_t old_header;
+        int ret = tlv_port_fram_read(idx->data_addr, &old_header, sizeof(old_header));
+        if (ret != TLV_OK)
+        {
+            transaction_snapshot_rollback();
+            release_stream_handle(handle);
+            TLV_TAG_ERROR(ret);
+            return TLV_STREAM_INVALID_HANDLE;
+        }
+
+        old_block_size = TLV_BLOCK_SIZE(old_header.length);
+        h->old_version = old_header.version;
+
+        if (new_block_size <= old_block_size)
+        {
+            // 原地更新
+            target_addr = idx->data_addr;
+            reduce_used_space(old_block_size);
+            increase_used_space(new_block_size);
+        }
+        else
+        {
+            // 需要重新分配
+            if (!has_free_slot)
+            {
+                transaction_snapshot_rollback();
+                release_stream_handle(handle);
+                TLV_TAG_ERROR(TLV_ERROR_NO_INDEX_SPACE);
+                return TLV_STREAM_INVALID_HANDLE;
+            }
+
+            target_addr = allocate_space(new_block_size);
+            if (target_addr == 0)
+            {
+                transaction_snapshot_rollback();
+                release_stream_handle(handle);
+                TLV_TAG_ERROR(TLV_ERROR_NO_MEMORY_SPACE);
+                return TLV_STREAM_INVALID_HANDLE;
+            }
+
+            need_add_index = true;
+            h->old_index = idx;
+            h->old_block_size = old_block_size;
+        }
+    }
+    else
+    {
+        // 新Tag
+        if (!has_free_slot)
+        {
+            transaction_snapshot_rollback();
+            release_stream_handle(handle);
+            TLV_TAG_ERROR(TLV_ERROR_NO_INDEX_SPACE);
+            return TLV_STREAM_INVALID_HANDLE;
+        }
+
+        target_addr = allocate_space(new_block_size);
+        if (target_addr == 0)
+        {
+            transaction_snapshot_rollback();
+            release_stream_handle(handle);
+            TLV_TAG_ERROR(TLV_ERROR_NO_MEMORY_SPACE);
+            return TLV_STREAM_INVALID_HANDLE;
+        }
+
+        need_add_index = true;
+    }
+
+    // 初始化句柄
+    h->tag = tag;
+    h->data_addr = target_addr;
+    h->current_offset = sizeof(tlv_data_block_header_t);
+    h->total_len = total_len;
+    h->processed_len = 0;
+    h->crc16 = tlv_crc16_init();
+    h->state = TLV_STREAM_STATE_WRITING;
+
+    // 构建并写入 Header
+    tlv_data_block_header_t header = {0};
+    header.tag = tag;
+    header.length = total_len;
+    header.version = meta->version;
+    header.flags = 0;
+    header.timestamp = tlv_port_get_timestamp_s();
+
+    // 读取旧的 write_count
+    if (!need_add_index && idx)
+    {
+        tlv_data_block_header_t old_hdr;
+        if (tlv_port_fram_read(target_addr, &old_hdr, sizeof(old_hdr)) == TLV_OK &&
+            old_hdr.tag == tag)
+        {
+            header.write_count = old_hdr.write_count + 1;
+        }
+        else
+        {
+            header.write_count = 1;
+        }
+    }
+    else
+    {
+        header.write_count = 1;
+    }
+
+    // 更新 CRC
+    h->crc16 = tlv_crc16_update(h->crc16, &header, sizeof(header));
+
+    // 写入 Header
+    int ret = tlv_port_fram_write(target_addr, &header, sizeof(header));
+    if (ret != TLV_OK)
+    {
+        transaction_snapshot_rollback();
+        release_stream_handle(handle);
+        TLV_TAG_ERROR(ret);
+        return TLV_STREAM_INVALID_HANDLE;
+    }
+
+#if TLV_DEBUG
+    tlv_printf("Stream write begin: handle=0x%08X, tag=0x%04X, len=%u\n",
+               handle, tag, total_len);
+#endif
+
+    return handle;
+}
+
+/**
+ * @brief 写入数据段
+ * @param handle 写入句柄
+ * @param data 数据指针
+ * @param len 数据长度
+ * @return TLV_OK: 成功, 其他: 错误码
+ */
+int tlv_write_chunk(tlv_stream_handle_t handle, const void *data, uint16_t len)
+{
+    if (!data || len == 0)
+    {
+        return TLV_SET_ERROR(TLV_ERROR_INVALID_PARAM, g_last_error.tag);
+    }
+
+    tlv_stream_context_internal_t *h = validate_and_get_handle(handle, TLV_STREAM_STATE_WRITING);
+    if (!h)
+    {
+        return TLV_SET_ERROR(TLV_ERROR_INVALID_HANDLE, g_last_error.tag);
+    }
+
+    // 检查是否超出总长度
+    if (h->processed_len + len > h->total_len)
+    {
+        tlv_printf("ERROR: Chunk exceeds total length (%u + %u > %u)\n",
+                   h->processed_len, len, h->total_len);
+        return TLV_SET_ERROR(TLV_ERROR_INVALID_PARAM, g_last_error.tag);
+    }
+
+    // 写入数据
+    int ret = tlv_port_fram_write(h->data_addr + h->current_offset, data, len);
+    if (ret != TLV_OK)
+    {
+        tlv_printf("ERROR: FRAM write failed at offset %u\n", h->current_offset);
+        return TLV_SET_ERROR(ret, g_last_error.tag);
+    }
+
+    // 更新 CRC
+    h->crc16 = tlv_crc16_update(h->crc16, data, len);
+
+    // 更新状态
+    h->current_offset += len;
+    h->processed_len += len;
+
+#if TLV_DEBUG
+    tlv_printf("Write chunk: handle=0x%08X, len=%u, progress=%u/%u\n",
+               handle, len, h->processed_len, h->total_len);
+#endif
+
+    return TLV_OK;
+}
+
+/**
+ * @brief 完成分段写入
+ * @param handle 写入句柄
+ * @return TLV_OK: 成功, 其他: 错误码
+ */
+int tlv_write_end(tlv_stream_handle_t handle)
+{
+    tlv_stream_context_internal_t *h = validate_and_get_handle(handle, TLV_STREAM_STATE_WRITING);
+    if (!h)
+    {
+        return TLV_SET_ERROR(TLV_ERROR_INVALID_HANDLE, g_last_error.tag);
+    }
+
+    // 检查是否写满
+    if (h->processed_len != h->total_len)
+    {
+        tlv_printf("ERROR: Incomplete write (%u/%u bytes)\n",
+                   h->processed_len, h->total_len);
+        return TLV_SET_ERROR(TLV_ERROR_INVALID_STATE, g_last_error.tag);
+    }
+
+    // 完成 CRC 计算
+    uint16_t crc = tlv_crc16_final(h->crc16);
+
+    // 写入 CRC
+    int ret = tlv_port_fram_write(h->data_addr + h->current_offset, &crc, sizeof(crc));
+    if (ret != TLV_OK)
+    {
+        tlv_printf("ERROR: CRC write failed\n");
+        transaction_snapshot_rollback();
+        system_header_save();
+        release_stream_handle(handle);
+        return TLV_SET_ERROR(ret, g_last_error.tag);
+    }
+
+    // 更新索引
+    tlv_index_entry_t *index = tlv_index_find(&g_tlv_ctx, h->tag);
+    bool need_add_index = (h->old_index != NULL);
+
+    if (need_add_index)
+    {
+        // 标记旧索引为脏
+        if (h->old_index && (h->old_index->flags & TLV_FLAG_VALID))
+        {
+            h->old_index->flags = TLV_FLAG_DIRTY;
+            reduce_used_space(h->old_block_size);
+            g_tlv_ctx.header->fragment_count++;
+            g_tlv_ctx.header->fragment_size += h->old_block_size;
+        }
+
+        // 添加新索引
+        tlv_index_entry_t *new_index = tlv_index_add(&g_tlv_ctx, h->tag, h->data_addr);
+        if (!new_index)
+        {
+            tlv_printf("CRITICAL: Index add failed\n");
+            transaction_snapshot_rollback();
+            system_header_save();
+            release_stream_handle(handle);
+            return TLV_SET_ERROR(TLV_ERROR_NO_INDEX_SPACE, g_last_error.tag);
+        }
+    }
+    else
+    {
+        // 更新现有索引
+        tlv_index_update(&g_tlv_ctx, h->tag, h->data_addr);
+    }
+
+    // 保存索引
+    ret = tlv_index_save(&g_tlv_ctx);
+    if (ret != TLV_OK)
+    {
+        tlv_printf("ERROR: Index save failed\n");
+        release_stream_handle(handle);
+        return TLV_SET_ERROR(ret, g_last_error.tag);
+    }
+
+    // 提交事务
+    transaction_snapshot_commit();
+
+    // 更新统计
+    g_tlv_ctx.header->total_writes++;
+    g_tlv_ctx.header->last_update_time = tlv_port_get_timestamp_s();
+
+    ret = system_header_save();
+    if (ret != TLV_OK)
+    {
+        release_stream_handle(handle);
+        return TLV_SET_ERROR(ret, g_last_error.tag);
+    }
+
+#if TLV_DEBUG
+    tlv_printf("Stream write completed: handle=0x%08X, tag=0x%04X, len=%u\n",
+               handle, h->tag, h->total_len);
+#endif
+
+    // 释放句柄
+    release_stream_handle(handle);
+
+    // 检查是否自动整理碎片
+#if TLV_AUTO_CLEAN_FRAGEMENT
+    uint32_t fragUsagePercent = 0;
+    ret = tlv_calculate_fragmentation(&fragUsagePercent);
+    if (ret == TLV_OK && fragUsagePercent >= TLV_AUTO_DEFRAG_THRESHOLD)
+    {
+        ret = tlv_defragment();
+        if (ret != TLV_OK)
+        {
+            tlv_printf("WARNING: Auto defragment failed: %d\n", ret);
+            TLV_SET_ERROR(ret, g_last_error.tag);
+        }
+    }
+#endif
+
+    return TLV_OK;
+}
+
+/**
+ * @brief 取消分段写入
+ * @param handle 写入句柄
+ */
+void tlv_write_abort(tlv_stream_handle_t handle)
+{
+    tlv_stream_context_internal_t *h = validate_and_get_handle(handle, TLV_STREAM_STATE_WRITING);
+    if (!h)
+    {
+        return;
+    }
+
+    tlv_printf("Aborting stream write: handle=0x%08X, tag=0x%04X, written=%u/%u\n",
+               handle, h->tag, h->processed_len, h->total_len);
+
+    // 回滚事务
+    transaction_snapshot_rollback();
+    system_header_save();
+
+    // 统计碎片
+    uint32_t wasted_size = TLV_BLOCK_SIZE(h->total_len);
+    g_tlv_ctx.header->fragment_count++;
+    g_tlv_ctx.header->fragment_size += wasted_size;
+
+    // 释放句柄
+    release_stream_handle(handle);
+}
+
+/* ============================ 流式读取API ============================ */
+
+/**
+ * @brief 开始分段读取
+ * @param tag Tag值
+ * @param total_len 输出总数据长度
+ * @return 读取句柄（TLV_INVALID_HANDLE 表示失败）
+ */
+tlv_stream_handle_t tlv_read_begin(uint16_t tag, uint16_t *total_len)
+{
+    if (tag == 0 || !total_len)
+    {
+        TLV_TAG_ERROR(TLV_ERROR_INVALID_PARAM);
+        return TLV_STREAM_INVALID_HANDLE;
+    }
+
+    if (g_tlv_ctx.state != TLV_STATE_INITIALIZED)
+    {
+        TLV_TAG_ERROR(TLV_ERROR);
+        return TLV_STREAM_INVALID_HANDLE;
+    }
+
+    // 查找索引
+    tlv_index_entry_t *index = tlv_index_find(&g_tlv_ctx, tag);
+    if (!index || !(index->flags & TLV_FLAG_VALID))
+    {
+        TLV_TAG_ERROR(TLV_ERROR_NOT_FOUND);
+        return TLV_STREAM_INVALID_HANDLE;
+    }
+
+    // 查找空闲句柄
+    tlv_stream_handle_t handle = find_free_stream_handle();
+    if (handle == TLV_STREAM_INVALID_HANDLE)
+    {
+        TLV_TAG_ERROR(TLV_ERROR_INVALID_HANDLE);
+        return TLV_STREAM_INVALID_HANDLE;
+    }
+
+    int idx = handle_to_index(handle);
+    tlv_stream_context_internal_t *h = &g_stream_ctx.handles[idx];
+
+    // 读取 Header
+    tlv_data_block_header_t header;
+    int ret = tlv_port_fram_read(index->data_addr, &header, sizeof(header));
+    if (ret != TLV_OK)
+    {
+        release_stream_handle(handle);
+        TLV_TAG_ERROR(ret);
+        return TLV_STREAM_INVALID_HANDLE;
+    }
+
+    // 验证 tag 匹配
+    if (header.tag != tag)
+    {
+        tlv_printf("ERROR: Tag mismatch (expected 0x%04X, got 0x%04X)\n",
+                   tag, header.tag);
+        release_stream_handle(handle);
+        TLV_TAG_ERROR(TLV_ERROR);
+        return TLV_STREAM_INVALID_HANDLE;
+    }
+
+    // 初始化句柄
+    h->tag = tag;
+    h->data_addr = index->data_addr;
+    h->current_offset = sizeof(tlv_data_block_header_t);
+    h->total_len = header.length;
+    h->processed_len = 0;
+    h->crc16 = tlv_crc16_init();
+    h->crc16 = tlv_crc16_update(h->crc16, &header, sizeof(header));
+    h->state = TLV_STREAM_STATE_READING;
+
+    *total_len = header.length;
+
+#if TLV_DEBUG
+    tlv_printf("Stream read begin: handle=0x%08X, tag=0x%04X, len=%u\n",
+               handle, tag, header.length);
+#endif
+
+    return handle;
+}
+
+/**
+ * @brief 读取数据段
+ * @param handle 读取句柄
+ * @param buf 输出缓冲区
+ * @param len 请求读取长度
+ * @return 实际读取长度（>=0 成功，<0 错误码）
+ */
+int tlv_read_chunk(tlv_stream_handle_t handle, void *buf, uint16_t *len)
+{
+    if (!buf || *len == 0)
+    {
+        return TLV_SET_ERROR(TLV_ERROR_INVALID_PARAM, g_last_error.error_code);
+    }
+
+    tlv_stream_context_internal_t *h = validate_and_get_handle(handle, TLV_STREAM_STATE_READING);
+    if (!h)
+    {
+        TLV_SET_ERROR(TLV_ERROR_INVALID_HANDLE, g_last_error.error_code);
+        return TLV_ERROR_INVALID_HANDLE;
+    }
+
+    // 计算实际可读取长度
+    uint16_t request_len = *len;
+    uint16_t remaining = h->total_len - h->processed_len;
+    uint16_t actual_len = (request_len > remaining) ? remaining : request_len;
+
+    if (actual_len == 0)
+    {
+        *len = 0;
+        return TLV_OK;
+    }
+
+    // 读取数据
+    int ret = tlv_port_fram_read(h->data_addr + h->current_offset, buf, actual_len);
+    if (ret != TLV_OK)
+    {
+        return TLV_SET_ERROR(ret, g_last_error.error_code);
+    }
+
+    h->crc16 = tlv_crc16_update(h->crc16, buf, actual_len);
+    h->current_offset += actual_len;
+    h->processed_len += actual_len;
+
+    *len = actual_len;
+
+#if TLV_DEBUG
+    tlv_printf("Read chunk: handle=0x%08X, len=%u, progress=%u/%u\n",
+               handle, actual_len, h->processed_len, h->total_len);
+#endif
+    return TLV_OK;
+}
+
+/**
+ * @brief 完成分段读取
+ * @param handle 读取句柄
+ * @return TLV_OK: 成功, 其他: 错误码
+ */
+int tlv_read_end(tlv_stream_handle_t handle)
+{
+    tlv_stream_context_internal_t *h = validate_and_get_handle(handle, TLV_STREAM_STATE_READING);
+    if (!h)
+    {
+        return TLV_SET_ERROR(TLV_ERROR_INVALID_HANDLE, g_last_error.error_code);
+    }
+
+    // 检查是否读完
+    if (h->processed_len != h->total_len)
+    {
+        tlv_printf("WARNING: Incomplete read (%u/%u bytes)\n",
+                   h->processed_len, h->total_len);
+        release_stream_handle(handle);
+        return TLV_SET_ERROR(TLV_ERROR_INVALID_STATE, g_last_error.error_code);
+    }
+
+    // 读取存储的 CRC
+    uint16_t stored_crc;
+    int ret = tlv_port_fram_read(h->data_addr + h->current_offset, &stored_crc, sizeof(stored_crc));
+    if (ret != TLV_OK)
+    {
+        tlv_printf("ERROR: CRC read failed\n");
+        release_stream_handle(handle);
+        return TLV_SET_ERROR(ret, g_last_error.error_code);
+    }
+
+    // 验证 CRC
+    uint16_t calc_crc = tlv_crc16_final(h->crc16);
+    if (calc_crc != stored_crc)
+    {
+        tlv_printf("ERROR: CRC mismatch (calc=0x%04X, stored=0x%04X)\n",
+                   calc_crc, stored_crc);
+        release_stream_handle(handle);
+        return TLV_SET_ERROR(TLV_ERROR_CRC_FAILED, g_last_error.error_code);
+    }
+
+#if TLV_DEBUG
+    tlv_printf("Stream read completed: handle=0x%08X, tag=0x%04X, len=%u, CRC=0x%04X\n",
+               handle, h->tag, h->total_len, calc_crc);
+#endif
+
+    // 释放句柄
+    release_stream_handle(handle);
+
+    return TLV_OK;
+}
+
+/**
+ * @brief 取消分段读取
+ * @param handle 读取句柄
+ */
+void tlv_read_abort(tlv_stream_handle_t handle)
+{
+    tlv_stream_context_internal_t *h = validate_and_get_handle(handle, TLV_STREAM_STATE_READING);
+    if (!h)
+    {
+        return;
+    }
+
+    tlv_printf("Aborting stream read: handle=0x%08X, tag=0x%04X, read=%u/%u\n",
+               handle, h->tag, h->processed_len, h->total_len);
+
+    // 释放句柄
+    release_stream_handle(handle);
+}
+
+/* ============================ 错误处理内部函数 ============================ */
+
+/**
+ * @brief 设置最后一次错误
+ * @param error_code 错误码
+ * @param tag 相关的 tag
+ * @param line 代码行号
+ * @param function 函数名
+ */
+static int tlv_set_last_error(int error_code, uint16_t tag,
+                              uint32_t line, const char *function)
+{
+    g_last_error.error_code = error_code;
+    g_last_error.tag = tag;
+    g_last_error.timestamp = tlv_port_get_timestamp_s();
+
+#if TLV_DEBUG
+    g_last_error.line = line;
+    g_last_error.function = function;
+
+    tlv_printf("ERROR: code=%d, tag=0x%04X, at %s:%u\n",
+               error_code, tag, function ? function : "unknown", line);
+#else
+    g_last_error.line = 0;
+    g_last_error.function = NULL;
+#endif
+
+#if TLV_ENABLE_ERROR_TRACKING
+    // 保存到历史记录
+    g_error_history[g_error_history_index] = g_last_error;
+    g_error_history_index = (g_error_history_index + 1) % TLV_ERROR_HISTORY_SIZE;
+#endif
+    return error_code;
+}
+
+/* ============================ 错误查询API ============================ */
+
+/**
+ * @brief 获取最后一次错误码
+ * @return 错误码（0 表示无错误）
+ */
+int tlv_get_last_error(void)
+{
+    return g_last_error.error_code;
+}
+
+/**
+ * @brief 获取最后一次错误的详细信息
+ * @param error_ctx 输出错误上下文（可选，传NULL只返回错误码）
+ * @return 错误码
+ */
+int tlv_get_last_error_ex(tlv_error_context_t *error_ctx)
+{
+    if (error_ctx)
+    {
+        *error_ctx = g_last_error;
+    }
+    return g_last_error.error_code;
+}
+
+/**
+ * @brief 清除错误状态
+ */
+void tlv_clear_error(void)
+{
+    memset(&g_last_error, 0, sizeof(tlv_error_context_t));
+}
+
+/**
+ * @brief 获取错误码对应的描述字符串
+ * @param error_code 错误码
+ * @return 错误描述字符串
+ */
+const char *tlv_get_error_string(int error_code)
+{
+    switch (error_code)
+    {
+    case TLV_OK:
+        return "Success";
+    case TLV_ERROR:
+        return "Generic error";
+    case TLV_ERROR_INVALID_PARAM:
+        return "Invalid parameter";
+    case TLV_ERROR_NOT_FOUND:
+        return "Tag not found";
+    case TLV_ERROR_NO_MEMORY_SPACE:
+        return "No memory space";
+    case TLV_ERROR_NO_INDEX_SPACE:
+        return "No index space";
+    case TLV_ERROR_CRC_FAILED:
+        return "CRC check failed";
+    case TLV_ERROR_CORRUPTED:
+        return "Data corrupted";
+    case TLV_ERROR_INVALID_HANDLE:
+        return "Invalid handle";
+    case TLV_ERROR_INVALID_STATE:
+        return "Invalid state";
+    case TLV_ERROR_NO_BUFFER_MEMORY:
+        return "Buffer too small";
+    default:
+        return "Unknown error";
+    }
+}
+
+#if TLV_ENABLE_ERROR_TRACKING
+/**
+ * @brief 获取错误历史记录
+ * @param history 输出缓冲区
+ * @param count 缓冲区大小（输入），实际记录数（输出）
+ * @return TLV_OK: 成功
+ */
+int tlv_get_error_history(tlv_error_context_t *history, uint8_t *count)
+{
+    if (!history || !count || *count == 0)
+    {
+        return TLV_ERROR_INVALID_PARAM;
+    }
+
+    uint8_t max_count = *count;
+    uint8_t actual_count = 0;
+
+    // 从最新的错误开始复制
+    for (int i = 0; i < TLV_ERROR_HISTORY_SIZE && actual_count < max_count; i++)
+    {
+        int idx = (g_error_history_index - 1 - i + TLV_ERROR_HISTORY_SIZE) % TLV_ERROR_HISTORY_SIZE;
+
+        if (g_error_history[idx].error_code != 0)
+        {
+            history[actual_count++] = g_error_history[idx];
+        }
+    }
+
+    *count = actual_count;
+    return TLV_OK;
+}
+
+/**
+ * @brief 清除错误历史
+ */
+void tlv_clear_error_history(void)
+{
+    memset(g_error_history, 0, sizeof(g_error_history));
+    g_error_history_index = 0;
+}
+#endif

@@ -10,7 +10,7 @@
 #include <stdbool.h>
  
 /* ============================ 版本信息 ============================ */
-#define TLV_FILE_SYSTEM_VERSION   "1.3.1"
+#define TLV_FILE_SYSTEM_VERSION   "1.4.0"
 
 /* ============================ 基础配置 ============================ */
  
@@ -51,6 +51,23 @@
 /** 读写缓冲区大小（静态分配） */
 #define TLV_BUFFER_SIZE              512
  
+/* ============================ 流式操作 ============================ */
+/** 最大同时流操作数 */
+#ifndef TLV_MAX_STREAM_HANDLES
+#define TLV_MAX_STREAM_HANDLES  2
+#endif
+
+/* ============================ 错误处理配置 ============================ */
+ 
+/** 启用错误历史记录（需要额外 256 字节 RAM） */
+#ifndef TLV_ENABLE_ERROR_TRACKING
+#define TLV_ENABLE_ERROR_TRACKING  0
+#endif
+ 
+/** 错误历史记录大小 */
+#ifndef TLV_ERROR_HISTORY_SIZE
+#define TLV_ERROR_HISTORY_SIZE  8
+#endif
 /* ============================ 地址配置 ============================ */
  
 /** 系统Header起始地址 */
@@ -82,7 +99,7 @@
 
 /** 数据块魔数 */
 #define TLV_BLOCK_MAGIC              0x44415441  // "DATA"
- 
+
 /* ============================ 错误代码 ============================ */
  
 /** 成功 */
@@ -115,6 +132,11 @@
 /** 数据损坏 */
 #define TLV_ERROR_CORRUPTED         -9
 
+/** 流句柄无效 */
+#define TLV_ERROR_INVALID_HANDLE    -10
+
+/** 流状态无效 */
+#define TLV_ERROR_INVALID_STATE     -11
 /* ============================ 编译检查 ============================ */
  
 #if TLV_FRAM_SIZE < (64 * 1024)

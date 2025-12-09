@@ -116,7 +116,113 @@ int tlv_read_batch(const uint16_t *tags, uint16_t count,
  */
 int tlv_write_batch(const uint16_t *tags, uint16_t count,
                     const void **datas, const uint16_t *lengths);
+/* ============================ 流操作API ============================ */
+
+/**
+ * @brief 开始分段写入
+ * @param tag Tag值
+ * @param total_len 总数据长度
+ * @return 写入句柄（TLV_INVALID_HANDLE 表示失败，通过 tlv_get_last_error() 获取错误码）
+ */
+tlv_stream_handle_t tlv_write_begin(uint16_t tag, uint16_t total_len);
+
+/**
+ * @brief 写入数据段
+ * @param handle 写入句柄
+ * @param data 数据指针
+ * @param len 数据长度
+ * @return TLV_OK: 成功, 其他: 错误码
+ */
+int tlv_write_chunk(tlv_stream_handle_t handle, const void *data, uint16_t len);
+
+/**
+ * @brief 完成分段写入
+ * @param handle 写入句柄
+ * @return TLV_OK: 成功, 其他: 错误码
+ */
+int tlv_write_end(tlv_stream_handle_t handle);
+
+
+/**
+ * @brief 取消分段写入
+ * @param handle 写入句柄
+ */
+void tlv_write_abort(tlv_stream_handle_t handle);
+
+
+
+/**
+ * @brief 开始分段读取
+ * @param tag Tag值
+ * @param total_len 输出总数据长度
+ * @return 读取句柄（TLV_INVALID_HANDLE 表示失败）
+ */
+tlv_stream_handle_t tlv_read_begin(uint16_t tag, uint16_t *total_len);
+
+/**
+ * @brief 读取数据段
+ * @param handle 读取句柄
+ * @param buf 输出缓冲区
+ * @param len 请求读取长度
+ * @return 实际读取长度（>=0 成功，<0 错误码）
+ */
+int tlv_read_chunk(tlv_stream_handle_t handle, void *buf, uint16_t *len);
+
+/**
+ * @brief 完成分段读取
+ * @param handle 读取句柄
+ * @return TLV_OK: 成功, 其他: 错误码
+ */
+int tlv_read_end(tlv_stream_handle_t handle);
+
+/**
+ * @brief 取消分段读取
+ * @param handle 读取句柄
+ */
+void tlv_read_abort(tlv_stream_handle_t handle);
+
+/* ============================ 错误处理API ============================ */
  
+/**
+ * @brief 获取最后一次错误码
+ * @return 错误码（0 表示无错误）
+ */
+int tlv_get_last_error(void);
+ 
+/**
+ * @brief 获取最后一次错误的详细信息
+ * @param error_ctx 输出错误上下文（可选，传NULL只返回错误码）
+ * @return 错误码
+ */
+int tlv_get_last_error_ex(tlv_error_context_t *error_ctx);
+ 
+/**
+ * @brief 清除错误状态
+ */
+void tlv_clear_error(void);
+ 
+/**
+ * @brief 获取错误码对应的描述字符串
+ * @param error_code 错误码
+ * @return 错误描述字符串
+ */
+const char *tlv_get_error_string(int error_code);
+ 
+#if TLV_ENABLE_ERROR_TRACKING
+/**
+ * @brief 获取错误历史记录
+ * @param history 输出缓冲区
+ * @param count 缓冲区大小（输入），实际记录数（输出）
+ * @return TLV_OK: 成功
+ */
+int tlv_get_error_history(tlv_error_context_t *history, uint8_t *count);
+ 
+/**
+ * @brief 清除错误历史
+ */
+void tlv_clear_error_history(void);
+#endif
+
 /* ============================ 查询与统计API ============================ */
  
 /**
