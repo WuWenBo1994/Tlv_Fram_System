@@ -26,7 +26,6 @@ static int system_header_save(void);
 static int system_header_verify(void);
 static uint32_t allocate_space(uint32_t size);
 static int write_data_block(uint16_t tag, const void *data, uint16_t len, uint32_t addr);
-static int read_data_block(uint32_t addr, void *buf, uint16_t *len);
 static const tlv_meta_const_t *get_meta(uint16_t tag);
 static int tlv_backup_all_internal(void);
 static void transaction_snapshot_create(void);
@@ -70,6 +69,8 @@ tlv_init_result_t tlv_init(void)
 
     // 初始化快照
     memset(&g_tlv_ctx.snapshot, 0, sizeof(g_tlv_ctx.snapshot));
+    g_tlv_ctx.snapshot.is_active = false;
+
     // 清零数据
     memset(&g_static_header, 0, sizeof(g_static_header));
     memset(&g_static_index, 0, sizeof(g_static_index));
@@ -232,7 +233,6 @@ int tlv_write(uint16_t tag, const void *data, uint16_t len)
         return TLV_ERROR_INVALID_PARAM;
     }
 
-    // 添加对上下文完整性的检查
     if (!g_tlv_ctx.header || !g_tlv_ctx.index_table)
     {
         return TLV_ERROR_INVALID_PARAM;
@@ -297,14 +297,14 @@ int tlv_write(uint16_t tag, const void *data, uint16_t len)
             // 索引表满,不分配空间
             if (!has_free_slot)
             {
-                return TLV_ERROR_NO_MEMORY;
+                return TLV_ERROR_NO_INDEX_SPACE;
             }
 
             // 分配新空间
             target_addr = allocate_space(new_block_size);
             if (target_addr == 0)
             {
-                return TLV_ERROR_NO_SPACE;
+                return TLV_ERROR_NO_MEMORY_SPACE;
             }
 
             // 需要新增索引
@@ -316,14 +316,14 @@ int tlv_write(uint16_t tag, const void *data, uint16_t len)
         // 索引表满,不分配空间
         if (!has_free_slot)
         {
-            return TLV_ERROR_NO_MEMORY;
+            return TLV_ERROR_NO_INDEX_SPACE;
         }
 
         // 新Tag,分配空间
         target_addr = allocate_space(new_block_size);
         if (target_addr == 0)
         {
-            return TLV_ERROR_NO_SPACE;
+            return TLV_ERROR_NO_MEMORY_SPACE;
         }
 
         // 需要新增索引
@@ -369,7 +369,7 @@ int tlv_write(uint16_t tag, const void *data, uint16_t len)
             // 这不应该发生（我们已经检查过）,且可以分配脏块给新索引使用
             tlv_printf("CRITICAL: Index add failed unexpectedly!\n");
             TLV_ASSERT(false);
-            return TLV_ERROR_NO_MEMORY;
+            return TLV_ERROR_NO_INDEX_SPACE;
         }
     }
     else // 更新索引
@@ -461,7 +461,7 @@ int tlv_read(uint16_t tag, void *buf, uint16_t *len)
     const tlv_meta_const_t *meta = get_meta(tag);
     if (meta && index->version < meta->version)
     {
-        // 执行到这里,输出缓冲区一定能承载旧数据,否则之前的read_data_block就会报错 TLV_ERROR_NO_MEMORY
+        // 执行到这里,输出缓冲区一定能承载旧数据,否则之前的read_data_block就会报错 TLV_ERROR_NO_BUFFER_MEMORY
         // 需要升级
         tlv_printf("Migrating tag 0x%04X on read: v%u -> v%u\n",
                    tag, index->version, meta->version);
@@ -486,7 +486,7 @@ int tlv_read(uint16_t tag, void *buf, uint16_t *len)
             read_len = new_len;
             // 索引版本已在 tlv_write() 中更新
         }
-        else if (ret == TLV_ERROR_NO_MEMORY)
+        else if (ret == TLV_ERROR_NO_BUFFER_MEMORY)
         {
             // 缓冲区不够,告知用户需要的大小
             *len = new_len; // 迁移函数应设置需要的大小
@@ -1494,7 +1494,7 @@ int read_data_block(uint32_t addr, void *buf, uint16_t *len)
     // 检查长度
     if (header.length > *len)
     {
-        return TLV_ERROR_NO_MEMORY;
+        return TLV_ERROR_NO_BUFFER_MEMORY;
     }
 
     // 读取数据

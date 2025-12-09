@@ -10,7 +10,7 @@
 #include <stdbool.h>
  
 /* ============================ 版本信息 ============================ */
-#define TLV_FILE_SYSTEM_VERSION   "1.2.1"
+#define TLV_FILE_SYSTEM_VERSION   "1.3.0"
 
 /* ============================ 基础配置 ============================ */
  
@@ -94,8 +94,8 @@
 /** 参数错误 */
 #define TLV_ERROR_INVALID_PARAM     -2
  
-/** 内存不足 */
-#define TLV_ERROR_NO_MEMORY         -3
+/** 缓冲区内存不足 */
+#define TLV_ERROR_NO_BUFFER_MEMORY  -3
  
 /** 未找到 */
 #define TLV_ERROR_NOT_FOUND         -4
@@ -106,12 +106,15 @@
 /** 版本不支持 */
 #define TLV_ERROR_VERSION           -6
  
-/** 空间不足 */
-#define TLV_ERROR_NO_SPACE          -7
+/** 内存空间不足 */
+#define TLV_ERROR_NO_MEMORY_SPACE   -7
  
+/** 索引空间不足 */
+#define TLV_ERROR_NO_INDEX_SPACE    -8
+
 /** 数据损坏 */
-#define TLV_ERROR_CORRUPTED         -8
- 
+#define TLV_ERROR_CORRUPTED         -9
+
 /* ============================ 编译检查 ============================ */
  
 #if TLV_FRAM_SIZE < (64 * 1024)

@@ -19,7 +19,7 @@
  *
  * @return TLV_OK 成功迁移
  *         TLV_ERROR_INVALID_PARAM 参数无效,旧数据长度不足
- *         TLV_ERROR_NO_MEMORY 缓冲区空间不足
+ *         TLV_ERROR_NO_BUFFER_MEMORY 缓冲区空间不足
  *         TLV_ERROR_VERSION 版本号不匹配
  */
 int migrate_system_config_v1_to_v2(void *data,
@@ -38,7 +38,7 @@ int migrate_system_config_v1_to_v2(void *data,
     if (max_size < sizeof(system_config_v2_t))
     {
 		*new_len = sizeof(system_config_v2_t);
-        return TLV_ERROR_NO_MEMORY;
+        return TLV_ERROR_NO_BUFFER_MEMORY;
     }
 
     if (old_ver != 1 && new_ver != 2)
@@ -86,7 +86,7 @@ int migrate_system_config_v1_to_v2(void *data,
  *
  * @return TLV_OK 成功迁移
  *         TLV_ERROR_INVALID_PARAM 参数无效,旧数据长度不足
- *         TLV_ERROR_NO_MEMORY 缓冲区空间不足
+ *         TLV_ERROR_NO_BUFFER_MEMORY 缓冲区空间不足
  *         TLV_ERROR_VERSION 版本号不匹配
  */
 int migrate_system_config_v2_to_v3(void *data,
@@ -105,7 +105,7 @@ int migrate_system_config_v2_to_v3(void *data,
     if (max_size < sizeof(system_config_v3_t))
     {
 		*new_len = sizeof(system_config_v3_t);
-        return TLV_ERROR_NO_MEMORY;
+        return TLV_ERROR_NO_BUFFER_MEMORY;
     }
 
     if (old_ver != 2 && new_ver != 3)

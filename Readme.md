@@ -444,7 +444,7 @@ TLV FRAM 系统中的批处理操作提供了同时读写多个数据项的高�
 ### 函数签名
 
 ```c++
-int tlv_read_batch(const uint16_t *tags, uint16_t count,              
+int tlv_read_batch(const uint16_t *tags, uint16_t count,            
 void **buffers, uint16_t *lengths);
 ```
 
@@ -472,7 +472,7 @@ void **buffers, uint16_t *lengths);
 ### 函数签名
 
 ```c++
-int tlv_write_batch(const uint16_t *tags, uint16_t count,              
+int tlv_write_batch(const uint16_t *tags, uint16_t count,            
 const void **datas, const uint16_t *lengths);
 ```
 
@@ -839,7 +839,6 @@ TLV 系统使用针对 FRAM 特性优化的固定内存布局：
 - **错误恢复**: 适当处理 `TLV_INIT_RECOVERED` 结果
 - **系统重置**: 系统关闭或重启前使用 `tlv_deinit()`
 
-
 初始化和格式化子系统为可靠的 TLV 数据操作提供了基础，确保在电源循环和错误条件下的系统完整性。
 
 # 备份与恢复系统
@@ -970,7 +969,6 @@ int tlv_migrate_tag(uint16_t tag, void *data, uint16_t old_len,
 3. **迁移事件**：版本升级触发迁移过程
 4. **恢复场景**：从验证的备份恢复系统
 
-
 ## 最佳实践
 
 - **定期备份**：根据应用程序关键性实施定期备份计划
@@ -999,7 +997,6 @@ uint32_t used = g_tlv_ctx.header->used_space;
 uint32_t wasted = allocated - used;
 *fragmentation_percent = (wasted * 100) / g_tlv_ctx.header->data_region_size;
 ```
-
 
 ### 碎片来源
 
@@ -1197,17 +1194,18 @@ TLV FRAM 系统提供全面的配置选项，允许开发者根据特定应用�
 
 系统提供全面的错误代码用于调试和错误处理 [tlv_config.h#L102-L119]：
 
-| 错误代码                    | 值 | 描述         |
-| --------------------------- | -- | ------------ |
-| `TLV_OK`                  | 0  | 成功         |
-| `TLV_ERROR`               | -1 | 一般错误     |
-| `TLV_ERROR_INVALID_PARAM` | -2 | 无效参数     |
-| `TLV_ERROR_NO_MEMORY`     | -3 | 内存不足     |
-| `TLV_ERROR_NOT_FOUND`     | -4 | 数据未找到   |
-| `TLV_ERROR_CRC_FAILED`    | -5 | CRC 验证失败 |
-| `TLV_ERROR_VERSION`       | -6 | 不支持的版本 |
-| `TLV_ERROR_NO_SPACE`      | -7 | 空间不足     |
-| `TLV_ERROR_CORRUPTED`     | -8 | 数据损坏     |
+| 错误代码                       | 值 | 描述         |
+| ------------------------------ | -- | ------------ |
+| `TLV_OK`                     | 0  | 成功         |
+| `TLV_ERROR`                  | -1 | 一般错误     |
+| `TLV_ERROR_INVALID_PARAM`    | -2 | 无效参数     |
+| `TLV_ERROR_NO_BUFFER_MEMORY` | -3 | 输出内存不足 |
+| `TLV_ERROR_NOT_FOUND`        | -4 | 数据未找到   |
+| `TLV_ERROR_CRC_FAILED`       | -5 | CRC 验证失败 |
+| `TLV_ERROR_VERSION`          | -6 | 不支持的版本 |
+| `TLV_ERROR_NO_MEMORY_SPACE`  | -7 | 内存空间不足 |
+| `TLV_ERROR_NO_INDEX_SPACE`   | -8 | 索引空间不足 |
+| `TLV_ERROR_CORRUPTED`        | -9 | 数据损坏     |
 
 ## 迁移配置
 
