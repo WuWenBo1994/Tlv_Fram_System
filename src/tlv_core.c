@@ -23,6 +23,7 @@ static tlv_stream_context_t g_stream_ctx = {0};
 
 /* 错误上下文 */
 static tlv_error_context_t g_last_error = {0};
+static uint16_t g_chunk_tag = 0xFFFF;
 /* ============================ 错误处理宏 ============================ */
 
 #if TLV_DEBUG
@@ -31,8 +32,8 @@ static tlv_error_context_t g_last_error = {0};
  * @param err 错误码
  * @param tag_val 相关的 tag（可选，传0表示无关）
  */
-#define TLV_SET_ERROR(err, tag_val) \
-    tlv_set_last_error((err), (tag_val), __LINE__, __func__)
+#define TLV_SET_ERROR(err) \
+    tlv_set_last_error((err), (g_chunk_tag), __LINE__, __func__)
 
 #define TLV_TAG_ERROR(err) \
     tlv_set_last_error((err), (tag), __LINE__, __func__)
@@ -41,8 +42,8 @@ static tlv_error_context_t g_last_error = {0};
 /**
  * @brief 精简版（不记录行号和函数名）
  */
-#define TLV_SET_ERROR(err, tag_val) \
-    tlv_set_last_error((err), (tag_val), 0, NULL)
+#define TLV_SET_ERROR(err) \
+    tlv_set_last_error((err), (g_chunk_tag), 0, NULL)
 #define TLV_TAG_ERROR(err) \
     tlv_set_last_error((err), (tag), 0, NULL)
 #endif
@@ -1920,6 +1921,9 @@ tlv_stream_handle_t tlv_write_begin(uint16_t tag, uint16_t total_len)
     h->crc16 = tlv_crc16_init();
     h->state = TLV_STREAM_STATE_WRITING;
 
+    // 暂存chunk_tag
+    g_chunk_tag = tag;
+
     // 构建并写入 Header
     tlv_data_block_header_t header = {0};
     header.tag = tag;
@@ -1979,13 +1983,13 @@ int tlv_write_chunk(tlv_stream_handle_t handle, const void *data, uint16_t len)
 {
     if (!data || len == 0)
     {
-        return TLV_SET_ERROR(TLV_ERROR_INVALID_PARAM, g_last_error.tag);
+        return TLV_SET_ERROR(TLV_ERROR_INVALID_PARAM);
     }
 
     tlv_stream_context_internal_t *h = validate_and_get_handle(handle, TLV_STREAM_STATE_WRITING);
     if (!h)
     {
-        return TLV_SET_ERROR(TLV_ERROR_INVALID_HANDLE, g_last_error.tag);
+        return TLV_SET_ERROR(TLV_ERROR_INVALID_HANDLE);
     }
 
     // 检查是否超出总长度
@@ -2234,6 +2238,9 @@ tlv_stream_handle_t tlv_read_begin(uint16_t tag, uint16_t *total_len)
     h->crc16 = tlv_crc16_update(h->crc16, &header, sizeof(header));
     h->state = TLV_STREAM_STATE_READING;
 
+    // 暂存chunk_tag
+    g_chunk_tag = tag;
+
     *total_len = header.length;
 
 #if TLV_DEBUG
@@ -2255,13 +2262,13 @@ int tlv_read_chunk(tlv_stream_handle_t handle, void *buf, uint16_t *len)
 {
     if (!buf || *len == 0)
     {
-        return TLV_SET_ERROR(TLV_ERROR_INVALID_PARAM, g_last_error.error_code);
+        return TLV_SET_ERROR(TLV_ERROR_INVALID_PARAM);
     }
 
     tlv_stream_context_internal_t *h = validate_and_get_handle(handle, TLV_STREAM_STATE_READING);
     if (!h)
     {
-        TLV_SET_ERROR(TLV_ERROR_INVALID_HANDLE, g_last_error.error_code);
+        TLV_SET_ERROR(TLV_ERROR_INVALID_HANDLE);
         return TLV_ERROR_INVALID_HANDLE;
     }
 
@@ -2280,7 +2287,7 @@ int tlv_read_chunk(tlv_stream_handle_t handle, void *buf, uint16_t *len)
     int ret = tlv_port_fram_read(h->data_addr + h->current_offset, buf, actual_len);
     if (ret != TLV_OK)
     {
-        return TLV_SET_ERROR(ret, g_last_error.error_code);
+        return TLV_SET_ERROR(ret);
     }
 
     h->crc16 = tlv_crc16_update(h->crc16, buf, actual_len);
@@ -2306,7 +2313,7 @@ int tlv_read_end(tlv_stream_handle_t handle)
     tlv_stream_context_internal_t *h = validate_and_get_handle(handle, TLV_STREAM_STATE_READING);
     if (!h)
     {
-        return TLV_SET_ERROR(TLV_ERROR_INVALID_HANDLE, g_last_error.error_code);
+        return TLV_SET_ERROR(TLV_ERROR_INVALID_HANDLE);
     }
 
     // 检查是否读完
@@ -2315,7 +2322,7 @@ int tlv_read_end(tlv_stream_handle_t handle)
         tlv_printf("WARNING: Incomplete read (%u/%u bytes)\n",
                    h->processed_len, h->total_len);
         release_stream_handle(handle);
-        return TLV_SET_ERROR(TLV_ERROR_INVALID_STATE, g_last_error.error_code);
+        return TLV_SET_ERROR(TLV_ERROR_INVALID_STATE);
     }
 
     // 读取存储的 CRC
@@ -2325,7 +2332,7 @@ int tlv_read_end(tlv_stream_handle_t handle)
     {
         tlv_printf("ERROR: CRC read failed\n");
         release_stream_handle(handle);
-        return TLV_SET_ERROR(ret, g_last_error.error_code);
+        return TLV_SET_ERROR(ret);
     }
 
     // 验证 CRC
@@ -2335,7 +2342,7 @@ int tlv_read_end(tlv_stream_handle_t handle)
         tlv_printf("ERROR: CRC mismatch (calc=0x%04X, stored=0x%04X)\n",
                    calc_crc, stored_crc);
         release_stream_handle(handle);
-        return TLV_SET_ERROR(TLV_ERROR_CRC_FAILED, g_last_error.error_code);
+        return TLV_SET_ERROR(TLV_ERROR_CRC_FAILED);
     }
 
 #if TLV_DEBUG
